@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenVPN Manager</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <!-- AOS (Animate On Scroll) -->
+    <link rel="stylesheet" href="https://unpkg.com/aos@2.3.1/dist/aos.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#09090b',
+                        surface: '#121214',
+                        border: '#27272a',
+                        primary: '#00f0ff',
+                        primaryHover: '#00d5e6',
+                        danger: '#ef4444',
+                        success: '#10b981'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'UI monospace', 'monospace']
+                    },
+                    boxShadow: {
+                        'glow': '0 0 15px rgba(0, 240, 255, 0.4)',
+                        'glow-lg': '0 0 25px rgba(0, 240, 255, 0.6)',
+                        'danger-glow': '0 0 15px rgba(239, 68, 68, 0.4)'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #09090b;
+            color: #ffffff;
+            /* subtle tech grid background pattern */
+            background-image: linear-gradient(rgba(39, 39, 42, 0.5) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(39, 39, 42, 0.5) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+        
+        .sci-fi-card {
+            background-color: #121214;
+            border: 1px solid #27272a;
+            border-radius: 0.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .sci-fi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00f0ff, transparent);
+            opacity: 0.5;
+        }
+        
+        .sci-fi-button {
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .sci-fi-button-primary {
+            background: transparent;
+            color: #00f0ff;
+            border: 1px solid #00f0ff;
+            text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+            box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.1);
+        }
+        
+        .sci-fi-button-primary:hover:not(:disabled) {
+            background: rgba(0, 240, 255, 0.1);
+            box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.2), 0 0 15px rgba(0, 240, 255, 0.4);
+        }
+        
+        .sci-fi-button-primary:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .sci-fi-button-danger {
+            background: transparent;
+            color: #ef4444;
+            border: 1px solid #ef4444;
+            text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+            box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.1);
+        }
+
+        .sci-fi-button-danger:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.1);
+            box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.2), 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+        
+        .sci-fi-button-danger:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .sci-fi-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+        }
+
+        /* Glitch text effect for the title */
+        .glitch-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .glitch-text {
+            color: white;
+            position: relative;
+            z-index: 1;
+        }
+        .glitch-text::before, .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+        .glitch-text::before {
+            color: #00f0ff;
+            z-index: -1;
+            transform: translate(-2px, 2px);
+            animation: glitch-anim 2s infinite alternate-reverse;
+        }
+        .glitch-text::after {
+            color: #ff00ea;
+            z-index: -2;
+            transform: translate(2px, -2px);
+            animation: glitch-anim 3s infinite alternate;
+            display: none; /* Keep it subtle */
+        }
+        
+        @keyframes glitch-anim {
+            0% { clip-path: inset(10% 0 10% 0); }
+            20% { clip-path: inset(80% 0 5% 0); }
+            40% { clip-path: inset(20% 0 40% 0); }
+            60% { clip-path: inset(50% 0 30% 0); }
+            80% { clip-path: inset(5% 0 80% 0); }
+            100% { clip-path: inset(30% 0 10% 0); }
+        }
+
+        /* Glass table styles */
+        .glass-table th {
+            border-bottom: 1px solid #27272a;
+            color: #a1a1aa;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 0.75rem;
+        }
+        .glass-table td {
+            border-bottom: 1px solid #27272a;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+        }
+        .glass-table tr:hover td {
+            background-color: rgba(39, 39, 42, 0.3);
+        }
+        .glass-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot.active {
+            background-color: #00f0ff;
+            box-shadow: 0 0 10px #00f0ff;
+            animation: pulse-glow 2s infinite;
+        }
+        .status-dot.inactive {
+            background-color: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+        .status-dot.failed {
+            background-color: #f97316;
+            box-shadow: 0 0 10px #f97316;
+            animation: pulse-warn 1s infinite;
+        }
+        .status-dot.not-installed {
+            background-color: #6b7280;
+            box-shadow: none;
+        }
+
+        @keyframes pulse-warn {
+            0% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(249, 115, 22, 0.9); }
+            100% { box-shadow: 0 0 5px rgba(249, 115, 22, 0.5); }
+        }
+
+        /* Banner for alerts */
+        .alert-banner {
+            border-left: 3px solid;
+            padding: 0.75rem 1rem;
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 1rem;
+            border-radius: 0 0.375rem 0.375rem 0;
+        }
+        .alert-warn {
+            border-color: #f97316;
+            background: rgba(249, 115, 22, 0.08);
+            color: #fdba74;
+        }
+        .alert-error {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.08);
+            color: #fca5a5;
+        }
+        .alert-info {
+            border-color: #00f0ff;
+            background: rgba(0, 240, 255, 0.05);
+            color: #67e8f9;
+        }
+
+        /* Log panel */
+        #logPanel {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 280px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #27272a transparent;
+            transition: opacity 0.15s ease;
+        }
+        #logPanel.log-refreshing {
+            opacity: 0.45;
+        }
+        #logPanel::-webkit-scrollbar { width: 4px; }
+        #logPanel::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 5px rgba(0, 240, 255, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(0, 240, 255, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(0, 240, 255, 0.5); }
+        }
+
+        @keyframes pulse-glow-green {
+            0% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.5); }
+            50% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.9); }
+            100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.5); }
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        /* Animated eye */
+        #eyeToggleBtn { cursor: pointer; outline: none; }
+        #eyeSvg { transition: filter 0.2s ease; filter: drop-shadow(0 0 2px rgba(0,240,255,0.25)); }
+        #eyeToggleBtn:hover #eyeSvg { filter: drop-shadow(0 0 6px rgba(0,240,255,0.65)); }
+        @keyframes eye-idle-glow {
+            0%,100% { filter: drop-shadow(0 0 2px rgba(0,240,255,0.25)); }
+            50%      { filter: drop-shadow(0 0 5px rgba(0,240,255,0.55)); }
+        }
+        #eyeSvg.eye-open { animation: eye-idle-glow 3s ease-in-out infinite; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+
+    <!-- Header -->
+    <header class="mb-10 w-full max-w-6xl mx-auto flex items-center justify-between" data-aos="fade-down" data-aos-duration="600">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded bg-surface border border-primary flex items-center justify-center shadow-glow">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-wider uppercase glitch-wrapper">
+                    <span class="glitch-text" data-text="OpenVPN Terminal">OpenVPN Terminal</span>
+                </h1>
+                <p class="text-gray-500 text-xs tracking-[0.2em] uppercase mt-1">System Control Interface</p>
+            </div>
+        </div>
+        
+        <div class="sci-fi-card px-4 py-2 flex items-center gap-4 border-gray-800">
+            <span class="text-sm text-gray-400 uppercase tracking-widest">Status</span>
+            <div class="flex items-center gap-2">
+                <span id="statusIndicator" class="status-dot"></span>
+                <span id="statusText" class="text-sm font-mono tracking-wider">LOADING...</span>
+            </div>
+            <button onclick="performLogout()" title="Logout"
+                    class="ml-2 text-gray-600 hover:text-danger transition-colors focus:outline-none"
+                    style="border-left:1px solid #27272a; padding-left:0.75rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+            </button>
+            <button onclick="openChangePasswordModal()" title="Change Password"
+                    class="text-gray-600 hover:text-primary transition-colors focus:outline-none"
+                    style="padding-left:0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Alert Banner (shown when not installed / no unit / failed) -->
+    <div id="alertBanner" class="hidden w-full max-w-6xl mx-auto mb-2"></div>
+
+    <!-- Change Password Modal -->
+    <div id="changePwModal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);">
+        <div class="sci-fi-card w-full max-w-md mx-4 p-6 flex flex-col gap-5" style="border-color:#00f0ff44;">
+            <div class="flex items-center justify-between">
+                <h2 class="font-mono text-sm uppercase tracking-widest text-primary">Change Password</h2>
+                <button onclick="closeChangePasswordModal()" class="text-gray-600 hover:text-gray-300 focus:outline-none transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <div>
+                    <label class="text-xs uppercase tracking-widest text-gray-500 font-mono block mb-1">Current Password</label>
+                    <input id="cpCurrent" type="password" autocomplete="current-password"
+                        class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-primary transition-all"
+                        placeholder="Enter current password">
+                </div>
+                <div>
+                    <label class="text-xs uppercase tracking-widest text-gray-500 font-mono block mb-1">New Password</label>
+                    <input id="cpNew" type="password" autocomplete="new-password"
+                        class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-primary transition-all"
+                        placeholder="Min 8 characters">
+                </div>
+                <div>
+                    <label class="text-xs uppercase tracking-widest text-gray-500 font-mono block mb-1">Confirm New Password</label>
+                    <input id="cpConfirm" type="password" autocomplete="new-password"
+                        class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-primary transition-all"
+                        placeholder="Repeat new password"
+                        onkeydown="if(event.key==='Enter') submitChangePassword()">
+                </div>
+            </div>
+
+            <div id="cpFeedback" class="hidden font-mono text-xs p-3 rounded bg-black/50 border border-primary text-primary"></div>
+
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeChangePasswordModal()"
+                    class="sci-fi-button px-4 py-2 rounded font-mono text-xs tracking-widest uppercase">
+                    Cancel
+                </button>
+                <button onclick="submitChangePassword()"
+                    class="sci-fi-button sci-fi-button-primary px-4 py-2 rounded font-mono text-xs tracking-widest uppercase">
+                    Update Password
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow">
+        
+        <!-- Controls Sidebar -->
+        <div class="lg:col-span-1 flex flex-col gap-6">
+            <!-- Control Panel -->
+            <div class="sci-fi-card p-6 border-gray-800 shadow-xl" data-aos="fade-right" data-aos-duration="600">
+                <h2 class="text-lg font-bold mb-6 text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                    </svg>
+                    Service Control
+                </h2>
+                
+                <div class="space-y-4">
+                    <button id="btnStart" onclick="performAction('start')" class="sci-fi-button sci-fi-button-primary w-full py-3 px-4 rounded font-mono text-sm tracking-widest uppercase flex justify-between items-center group">
+                        <span>Initialize Service</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    
+                    <button id="btnRestart" onclick="performAction('restart')" class="sci-fi-button sci-fi-button-primary w-full py-3 px-4 rounded font-mono text-sm tracking-widest uppercase flex justify-between items-center group">
+                        <span>Reboot Service</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+
+                    <button id="btnStop" onclick="performAction('stop')" class="sci-fi-button sci-fi-button-danger w-full py-3 px-4 rounded font-mono text-sm tracking-widest uppercase flex justify-between items-center group mt-8">
+                        <span>Halt Service</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                        </svg>
+                    </button>
+
+                    <!-- Install button: only visible when OpenVPN is not installed -->
+                    <button id="btnInstall" onclick="performInstall()" class="sci-fi-button sci-fi-button-primary w-full py-3 px-4 rounded font-mono text-sm tracking-widest uppercase flex justify-between items-center group hidden" style="border-color:#f97316;color:#f97316;box-shadow:inset 0 0 10px rgba(249,115,22,0.1);">
+                        <span>Install OpenVPN</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Action Feedback -->
+                <div id="actionFeedback" class="mt-4 text-xs font-mono p-3 rounded bg-black/50 border border-gray-800 text-gray-500 hidden opacity-0 transition-opacity">
+                    > Sequence initiated...
+                </div>
+            </div>
+            
+            <!-- System Info Card -->
+            <div class="sci-fi-card p-5 border-gray-800 shadow-xl" data-aos="fade-right" data-aos-delay="150" data-aos-duration="600">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                    </svg>
+                    System Info
+                </h3>
+
+                <!-- Hostname + Kernel -->
+                <div class="space-y-1 font-mono text-xs mb-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Host</span>
+                        <span class="text-primary truncate max-w-36" id="siHostname">—</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Kernel</span>
+                        <span class="text-gray-300 truncate max-w-36" id="siKernel">—</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Uptime</span>
+                        <span class="text-gray-300" id="siUptime">—</span>
+                    </div>
+                </div>
+
+                <!-- CPU -->
+                <div class="mb-3">
+                    <div class="flex justify-between font-mono text-xs mb-1">
+                        <span class="text-gray-500">CPU</span>
+                        <span id="siCpuPct" class="text-gray-300">—%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                        <div id="siCpuBar" class="h-full rounded-full transition-all duration-700" style="width:0%;background:linear-gradient(90deg,#00f0ff,#0080aa)"></div>
+                    </div>
+                </div>
+
+                <!-- Memory -->
+                <div class="mb-3">
+                    <div class="flex justify-between font-mono text-xs mb-1">
+                        <span class="text-gray-500">Memory</span>
+                        <span id="siMemPct" class="text-gray-300">—%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                        <div id="siMemBar" class="h-full rounded-full transition-all duration-700" style="width:0%;background:linear-gradient(90deg,#10b981,#047857)"></div>
+                    </div>
+                    <div class="flex justify-between font-mono text-xs mt-0.5 text-gray-600">
+                        <span id="siMemUsed">—</span>
+                        <span id="siMemTotal">—</span>
+                    </div>
+                </div>
+
+                <!-- Storage -->
+                <div>
+                    <div class="flex justify-between font-mono text-xs mb-1">
+                        <span class="text-gray-500">Storage (/)</span>
+                        <span id="siDiskPct" class="text-gray-300">—%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                        <div id="siDiskBar" class="h-full rounded-full transition-all duration-700" style="width:0%;background:linear-gradient(90deg,#f59e0b,#b45309)"></div>
+                    </div>
+                    <div class="flex justify-between font-mono text-xs mt-0.5 text-gray-600">
+                        <span id="siDiskUsed">—</span>
+                        <span id="siDiskTotal">—</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connections Table -->
+        <div class="lg:col-span-2 flex flex-col h-full">
+            <div class="sci-fi-card flex-grow flex flex-col border-gray-800 shadow-xl overflow-hidden" data-aos="fade-left" data-aos-duration="600">
+                <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-surface z-10">
+                    <h2 class="text-lg font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Connected Modules
+                    </h2>
+                    <button onclick="refreshData()" class="text-gray-500 hover:text-primary transition-colors focus:outline-none" title="Refresh Data">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto flex-grow bg-black/20">
+                    <table class="w-full text-left border-collapse glass-table" id="clientsTable">
+                        <thead class="bg-surface/50 sticky top-0 backdrop-blur-sm z-10">
+                            <tr>
+                                <th class="p-4">Ident</th>
+                                <th class="p-4">Vector (IP)</th>
+                                <th class="p-4">RX/TX Bytes</th>
+                                <th class="p-4">Link Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientsTableBody">
+                            <!-- Data will be populated here via JS -->
+                            <tr>
+                                <td colspan="4" class="text-center p-8 text-gray-500 font-mono text-sm shimmer">
+                                    [ SCANNING SECURE CHANNELS... ]
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="p-3 border-t border-gray-800 bg-surface/80 flex justify-between items-center text-xs text-gray-500 font-mono">
+                    <span id="lastUpdateText">Last scan: --:--:--</span>
+                    <span>ACTIVE CONNECTIONS: <span id="clientCount" class="text-primary glow">0</span></span>
+                </div>
+            </div>
+
+            <!-- Journal / Log Panel -->
+            <div class="sci-fi-card border-gray-800 shadow-xl overflow-hidden" data-aos="fade-up" data-aos-delay="100" data-aos-duration="600">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-surface z-10">
+                    <h2 class="text-sm font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        System Journal
+                    </h2>
+                    <button onclick="fetchLogs()" class="text-gray-500 hover:text-primary transition-colors focus:outline-none" title="Refresh Logs">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-4 bg-black/30">
+                    <div id="logPanel" class="text-gray-400">[ Loading journal... ]</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Client Management -->
+    <section class="w-full max-w-6xl mx-auto mt-6 mb-10" data-aos="fade-up" data-aos-duration="600">
+        <div class="sci-fi-card border-gray-800 shadow-xl overflow-hidden">
+            <!-- Header -->
+            <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-surface">
+                <h2 class="text-lg font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Client Management
+                </h2>
+                <button onclick="fetchProvisionedClients()" class="text-gray-500 hover:text-primary transition-colors focus:outline-none" title="Refresh">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-6 flex flex-col gap-5">
+                <!-- Create Form -->
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                        <span class="text-xs uppercase tracking-widest text-gray-500 font-mono w-24">Client Name</span>
+                        <input id="newClientName" type="text" placeholder="e.g. phone-ali" maxlength="64"
+                            class="flex-grow bg-black/40 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-primary transition-all"
+                            onkeydown="if(event.key==='Enter') createClient()">
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                        <span class="text-xs uppercase tracking-widest text-gray-500 font-mono w-24">Passphrase</span>
+                        <div class="flex-grow relative">
+                            <input id="clientPassphrase" type="password" placeholder="Optional &#8212; min 8 chars" maxlength="128"
+                                class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 pr-10 rounded focus:outline-none focus:border-primary transition-all"
+                                onkeydown="if(event.key==='Enter') createClient()">
+                            <button type="button" id="eyeToggleBtn" onclick="togglePassphraseVisibility()"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 focus:outline-none" title="Show / Hide">
+                                <svg id="eyeSvg" viewBox="0 0 50 30" width="32" height="20" style="overflow:visible;display:block;">
+                                    <defs>
+                                        <radialGradient id="ppIrisGrad" cx="42%" cy="38%" r="60%">
+                                            <stop offset="0%" stop-color="#00f0ff"/>
+                                            <stop offset="55%" stop-color="#006b8a"/>
+                                            <stop offset="100%" stop-color="#002a38"/>
+                                        </radialGradient>
+                                    </defs>
+                                    <!-- Sclera -->
+                                    <path d="M1,15 Q25,2 49,15 Q25,28 1,15 Z" fill="#040e17"/>
+                                    <!-- Iris -->
+                                    <circle id="ppIris" cx="25" cy="15" r="8" fill="url(#ppIrisGrad)"/>
+                                    <!-- Pupil -->
+                                    <circle id="ppPupil" cx="25" cy="15" r="4" fill="#010c14"/>
+                                    <!-- Inner pupil ring -->
+                                    <circle id="ppPupilInner" cx="25" cy="15" r="2" fill="rgba(0,140,180,0.12)"/>
+                                    <!-- Highlights -->
+                                    <circle id="ppHL1" cx="27.5" cy="11.5" r="1.3" fill="rgba(0,240,255,0.9)"/>
+                                    <circle id="ppHL2" cx="30" cy="14" r="0.5" fill="rgba(0,240,255,0.4)"/>
+                                    <!-- Upper eyelid -->
+                                    <path id="ppLidUp" d="M1,15 Q25,2 49,15 L49,-3 L1,-3 Z" fill="#09090b"/>
+                                    <!-- Lower eyelid -->
+                                    <path id="ppLidDn" d="M1,15 Q25,28 49,15 L49,33 L1,33 Z" fill="#09090b"/>
+                                    <!-- Eye outline always on top -->
+                                    <path d="M1,15 Q25,2 49,15 Q25,28 1,15 Z" fill="none" stroke="#00f0ff" stroke-width="0.8" opacity="0.7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <button onclick="createClient()"
+                            class="sci-fi-button sci-fi-button-primary px-5 py-2 rounded font-mono text-xs tracking-widest uppercase whitespace-nowrap flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Generate Profile
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-600 font-mono pl-0 sm:pl-28">
+                        &#9432; Passphrase encrypts the private key inside the .ovpn file. The user will be prompted when connecting.
+                    </p>
+                </div>
+
+                <!-- Feedback -->
+                <div id="clientMgmtFeedback" class="hidden font-mono text-xs p-3 rounded bg-black/50 border border-primary text-primary"></div>
+
+                <!-- Clients Table -->
+                <div class="overflow-x-auto rounded border border-gray-800">
+                    <table class="w-full text-left border-collapse glass-table">
+                        <thead class="bg-surface/50">
+                            <tr>
+                                <th class="p-4">Client Name</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4">Created</th>
+                                <th class="p-4">Security</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="provisionedClientsBody">
+                            <tr>
+                                <td colspan="3" class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest shimmer">
+                                    [ LOADING PROFILES... ]
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Group Management -->
+    <section class="w-full max-w-6xl mx-auto mt-6 mb-10" data-aos="fade-up" data-aos-duration="600">
+        <div class="sci-fi-card border-gray-800 shadow-xl overflow-hidden">
+            <!-- Header -->
+            <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-surface">
+                <h2 class="text-lg font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zM5 11a2 2 0 100-4 2 2 0 000 4z" />
+                    </svg>
+                    Group Management
+                </h2>
+                <button onclick="fetchGroups()" class="text-gray-500 hover:text-primary transition-colors focus:outline-none" title="Refresh">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-6 flex flex-col gap-6">
+                <!-- Create Group Form -->
+                <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                    <span class="text-xs uppercase tracking-widest text-gray-500 font-mono whitespace-nowrap">New Group</span>
+                    <input id="newGroupName" type="text" placeholder="e.g. Sales Team" maxlength="64"
+                        class="flex-grow bg-black/40 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-primary transition-all"
+                        onkeydown="if(event.key==='Enter') createGroup()">
+                    <button onclick="createGroup()"
+                        class="sci-fi-button sci-fi-button-primary px-5 py-2 rounded font-mono text-xs tracking-widest uppercase whitespace-nowrap flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Create Group
+                    </button>
+                </div>
+
+                <!-- Feedback -->
+                <div id="groupFeedback" class="hidden font-mono text-xs p-3 rounded bg-black/50 border border-primary text-primary"></div>
+
+                <!-- Groups List -->
+                <div id="groupsList" class="flex flex-col gap-4">
+                    <div class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest shimmer">[ LOADING GROUPS... ]</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Group Detail Modal -->
+    <div id="groupModal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);">
+        <div class="sci-fi-card w-full max-w-3xl mx-4 flex flex-col" style="border-color:#00f0ff44;max-height:90vh;overflow-y:auto;">
+            <div class="p-5 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-surface z-10">
+                <h2 id="groupModalTitle" class="font-mono text-sm uppercase tracking-widest text-primary">Group Detail</h2>
+                <button onclick="closeGroupModal()" class="text-gray-600 hover:text-gray-300 focus:outline-none transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-5 flex flex-col gap-6">
+                <!-- Members -->
+                <div>
+                    <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Members
+                    </h3>
+                    <div id="groupModalMembers" class="flex flex-wrap gap-2 min-h-[2rem] p-3 bg-black/30 rounded border border-gray-800 mb-3"></div>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <span class="text-xs text-gray-500 font-mono">Add client:</span>
+                        <select id="gmAddMemberSel"
+                            class="bg-black/40 border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-primary transition-all">
+                            <option value="">-- select client --</option>
+                        </select>
+                        <button onclick="gmAddMember()"
+                            class="sci-fi-button sci-fi-button-primary px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase">
+                            Add
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Rules -->
+                <div>
+                    <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        Access Rules
+                    </h3>
+
+                    <!-- Rules table -->
+                    <div class="overflow-x-auto rounded border border-gray-800 mb-4">
+                        <table class="w-full text-left border-collapse glass-table text-xs">
+                            <thead class="bg-surface/50">
+                                <tr>
+                                    <th class="p-3">Proto</th>
+                                    <th class="p-3">Destination</th>
+                                    <th class="p-3">Port</th>
+                                    <th class="p-3">Action</th>
+                                    <th class="p-3">Comment</th>
+                                    <th class="p-3 text-right">Del</th>
+                                </tr>
+                            </thead>
+                            <tbody id="groupModalRulesBody">
+                                <tr><td colspan="6" class="text-center p-6 text-gray-600 font-mono tracking-widest">[ NO RULES ]</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Add Rule Form -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 items-end">
+                        <div>
+                            <label class="text-xs text-gray-500 font-mono block mb-1">Proto</label>
+                            <select id="gmRuleProto" class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-primary transition-all">
+                                <option value="all">all</option>
+                                <option value="tcp">tcp</option>
+                                <option value="udp">udp</option>
+                                <option value="icmp">icmp</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="text-xs text-gray-500 font-mono block mb-1">Destination (CIDR)</label>
+                            <input id="gmRuleDest" type="text" placeholder="0.0.0.0/0"
+                                class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-primary transition-all">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 font-mono block mb-1">Port / Range</label>
+                            <input id="gmRulePort" type="text" placeholder="80 or 8000:9000"
+                                class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-primary transition-all">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 font-mono block mb-1">Action</label>
+                            <select id="gmRuleAction" class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-primary transition-all">
+                                <option value="ACCEPT">ACCEPT</option>
+                                <option value="DROP">DROP</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="text-xs text-gray-500 font-mono block mb-1">Comment</label>
+                            <input id="gmRuleComment" type="text" placeholder="Optional description" maxlength="128"
+                                class="w-full bg-black/40 border border-gray-700 text-gray-200 font-mono text-xs px-2 py-1.5 rounded focus:outline-none focus:border-primary transition-all">
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="gmAddRule()"
+                                class="w-full sci-fi-button sci-fi-button-primary px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase">
+                                + Add Rule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Feedback -->
+                <div id="groupModalFeedback" class="hidden font-mono text-xs p-3 rounded bg-black/50 border border-primary text-primary"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Endpoints
+        const API_STATUS = '/api/status';
+        const API_ACTION = '/api/action';
+        const API_CLIENTS = '/api/clients';
+        const API_INSTALL = '/api/install';
+        const API_LOGS = '/api/logs';
+        const API_CLIENTS_CREATE   = '/api/clients/create';
+        const API_CLIENTS_LIST     = '/api/clients/list';
+        const API_CLIENTS_DOWNLOAD = '/api/clients/download';
+        const API_CLIENTS_REVOKE   = '/api/clients/revoke';
+        const API_SYSINFO          = '/api/sysinfo';
+
+        let isServiceActive = false;
+        let currentStatusState = ''; // 'active' | 'inactive' | 'failed' | 'not_installed' | 'no_unit'
+        let connectedClientNames = new Set(); // names currently connected to VPN
+
+        // Redirect to login on any 401 response
+        async function apiFetch(url, options) {
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                window.location.replace('/login.html');
+                throw new Error('Unauthorized');
+            }
+            return res;
+        }
+
+        // Logout
+        async function performLogout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+            } finally {
+                window.location.replace('/login.html');
+            }
+        }
+
+        // Change Password Modal
+        function openChangePasswordModal() {
+            document.getElementById('cpCurrent').value = '';
+            document.getElementById('cpNew').value = '';
+            document.getElementById('cpConfirm').value = '';
+            const fb = document.getElementById('cpFeedback');
+            fb.className = 'hidden font-mono text-xs p-3 rounded bg-black/50 border border-primary text-primary';
+            fb.textContent = '';
+            document.getElementById('changePwModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('cpCurrent').focus(), 50);
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById('changePwModal').classList.add('hidden');
+        }
+
+        async function submitChangePassword() {
+            const current = document.getElementById('cpCurrent').value;
+            const newPw   = document.getElementById('cpNew').value;
+            const confirm = document.getElementById('cpConfirm').value;
+            const fb = document.getElementById('cpFeedback');
+
+            const showFb = (msg, isError) => {
+                fb.textContent = msg;
+                fb.className = `font-mono text-xs p-3 rounded bg-black/50 border ${
+                    isError ? 'border-danger text-danger' : 'border-success text-success'}`;
+            };
+
+            if (!current)        { showFb('Current password is required.', true);  return; }
+            if (newPw.length < 8){ showFb('New password must be at least 8 characters.', true); return; }
+            if (newPw !== confirm){ showFb('New password and confirmation do not match.', true); return; }
+
+            try {
+                const res = await apiFetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ current_password: current, new_password: newPw, confirm_password: confirm })
+                });
+                if (res.ok) {
+                    showFb('Password changed successfully. You will be logged out now.', false);
+                    setTimeout(() => performLogout(), 2000);
+                } else {
+                    const txt = await res.text();
+                    showFb(txt || 'Failed to change password.', true);
+                }
+            } catch (err) {
+                showFb('Connection error.', true);
+            }
+        }
+
+        // Format bytes helper
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 B';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function utcToLocal(utcStr) {
+            if (!utcStr) return '-';
+            // OpenVPN status log writes time in UTC ("YYYY-MM-DD HH:MM:SS")
+            const d = new Date(utcStr.replace(' ', 'T') + 'Z');
+            if (isNaN(d)) return utcStr;
+            return d.toLocaleString(undefined, {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        function setAlertBanner(type, html) {
+            const banner = document.getElementById('alertBanner');
+            if (!type) {
+                banner.className = 'hidden w-full max-w-6xl mx-auto mb-2';
+                banner.innerHTML = '';
+                return;
+            }
+            banner.className = `w-full max-w-6xl mx-auto mb-2`;
+            banner.innerHTML = `<div class="alert-banner alert-${type}">${html}</div>`;
+        }
+
+        // Toggle buttons based on status
+        function updateUIState(data) {
+            const btnStart   = document.getElementById('btnStart');
+            const btnStop    = document.getElementById('btnStop');
+            const btnRestart = document.getElementById('btnRestart');
+            const btnInstall = document.getElementById('btnInstall');
+
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText      = document.getElementById('statusText');
+
+            currentStatusState = data.status;
+            isServiceActive = data.active;
+
+            // Reset all disabled states
+            btnStart.disabled = false;
+            btnStop.disabled = false;
+            btnRestart.disabled = false;
+            btnInstall.classList.add('hidden');
+
+            if (data.status === 'not_installed') {
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+                btnRestart.disabled = true;
+                btnInstall.classList.remove('hidden');
+
+                statusIndicator.className = 'status-dot not-installed';
+                statusText.className = 'text-sm font-mono tracking-widest text-gray-500';
+                statusText.innerText = 'NOT INSTALLED';
+
+                setAlertBanner('error',
+                    '&#9888; OpenVPN is <strong>not installed</strong> on this system. ' +
+                    'Click <em>Install OpenVPN</em> to install it via apt-get, or install it manually.'
+                );
+
+            } else if (data.status === 'no_unit') {
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+                btnRestart.disabled = true;
+
+                statusIndicator.className = 'status-dot inactive';
+                statusText.className = 'text-sm font-mono tracking-widest text-yellow-400';
+                statusText.innerText = 'NO SERVICE UNIT';
+
+                setAlertBanner('warn',
+                    '&#9888; OpenVPN is installed but <strong>no systemd service unit</strong> was found.<br>' +
+                    'Ensure a server configuration file exists at <code>/etc/openvpn/server.conf</code> ' +
+                    'and that the <code>openvpn@.service</code> unit is available. ' +
+                    'You may need to run: <code>sudo systemctl enable openvpn@server</code>'
+                );
+
+            } else if (data.status === 'failed') {
+                btnStart.disabled = false;
+                btnStop.disabled = false;
+                btnRestart.disabled = false;
+
+                statusIndicator.className = 'status-dot failed';
+                statusText.className = 'text-sm font-mono tracking-widest text-orange-400';
+                statusText.innerText = 'FAILED';
+
+                setAlertBanner('warn',
+                    '&#9888; The <strong>openvpn@server</strong> service has <strong>failed</strong>. ' +
+                    'Check the journal below for error details, then use <em>Reboot Service</em> to retry.'
+                );
+
+            } else if (data.active) {
+                btnStart.disabled = true;
+                btnStop.disabled = false;
+                btnRestart.disabled = false;
+
+                statusIndicator.className = 'status-dot active';
+                statusText.className = 'text-sm font-mono tracking-widest text-primary';
+                statusText.innerText = 'ONLINE';
+
+                setAlertBanner(null, '');
+
+            } else {
+                // inactive / stopped
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                btnRestart.disabled = true;
+
+                statusIndicator.className = 'status-dot inactive';
+                statusText.className = 'text-sm font-mono tracking-widest text-danger';
+                statusText.innerText = 'OFFLINE';
+
+                setAlertBanner('info',
+                    'ℹ Service is stopped. Use <em>Initialize Service</em> to start it.'
+                );
+            }
+        }
+
+        function showFeedback(msg, isError = false) {
+            const fb = document.getElementById('actionFeedback');
+            fb.innerHTML = `> ${escapeHtml(msg)}`;
+            fb.className = `mt-4 text-xs font-mono p-3 rounded bg-black/50 border ${isError ? 'border-danger text-danger' : 'border-primary text-primary'} block transition-opacity`;
+            setTimeout(() => {
+                fb.classList.add('opacity-0');
+                setTimeout(() => fb.classList.add('hidden'), 300);
+            }, 4000);
+        }
+
+        // Fetch Status
+        async function fetchStatus() {
+            try {
+                const res = await apiFetch(API_STATUS);
+                const data = await res.json();
+                updateUIState(data);
+            } catch (err) {
+                if (err.message !== 'Unauthorized') {
+                    console.error("Failed to fetch status", err);
+                    updateUIState({ active: false, status: 'inactive', installed: false, unit_exists: false });
+                }
+            }
+        }
+
+        // Fetch Clients
+        async function fetchClients() {
+            try {
+                const res = await apiFetch(API_CLIENTS);
+                const data = await res.json();
+
+                const tbody = document.getElementById('clientsTableBody');
+                const countSpan = document.getElementById('clientCount');
+
+                // Update connected set & re-render management table
+                connectedClientNames = new Set((data || []).map(c => c.name));
+                renderProvisionedClients();
+
+                if (!data || data.length === 0) {
+                    const emptyMsg = isServiceActive
+                        ? '[ NO ACTIVE CONNECTIONS DETECTED ]'
+                        : '[ SERVICE OFFLINE — NO CONNECTION DATA ]';
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest">
+                                ${emptyMsg}
+                            </td>
+                        </tr>
+                    `;
+                    countSpan.innerText = "0";
+                } else {
+                    countSpan.innerText = data.length;
+                    tbody.innerHTML = data.map(client => `
+                        <tr class="transition-colors group hover:bg-white/5 border-l-2 border-transparent hover:border-primary">
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 rounded-full bg-primary/50 group-hover:bg-primary group-hover:shadow-[0_0_8px_#00f0ff] transition-all"></div>
+                                    <span class="text-gray-200">${escapeHtml(client.name)}</span>
+                                </div>
+                            </td>
+                            <td class="text-gray-400">${escapeHtml(client.real_address.split(':')[0])}</td>
+                            <td>
+                                <div class="flex flex-col gap-1 text-xs">
+                                    <div class="flex justify-between w-24">
+                                        <span class="text-gray-500">RX:</span>
+                                        <span class="text-primary">${formatBytes(client.bytes_received)}</span>
+                                    </div>
+                                    <div class="flex justify-between w-24">
+                                        <span class="text-gray-500">TX:</span>
+                                        <span class="text-success">${formatBytes(client.bytes_sent)}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-gray-400 text-xs">${utcToLocal(client.connected_since)}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                document.getElementById('lastUpdateText').innerText = `Last scan: ${new Date().toLocaleTimeString()}`;
+            } catch (err) {
+                console.error("Failed to fetch clients", err);
+            }
+        }
+
+        // Fetch Logs
+        let _lastLogText = '';
+        let _logFetching = false;
+
+        async function fetchLogs() {
+            if (_logFetching) return; // skip if previous fetch still in-flight
+            _logFetching = true;
+            const panel = document.getElementById('logPanel');
+
+            // Dim slightly instead of blanking — content stays visible
+            panel.classList.add('log-refreshing');
+
+            // Remember if user is scrolled to the bottom
+            const atBottom = panel.scrollHeight - panel.clientHeight - panel.scrollTop < 32;
+
+            try {
+                const res = await apiFetch(`${API_LOGS}?lines=60`);
+                const data = await res.json();
+                const text = (data.logs || '[ No log data available ]').trimEnd();
+
+                // Only repaint when content actually changed
+                if (text !== _lastLogText) {
+                    _lastLogText = text;
+                    panel.innerText = text;
+                    if (atBottom) panel.scrollTop = panel.scrollHeight;
+                }
+            } catch (err) {
+                if (err.message !== 'Unauthorized') {
+                    const errMsg = '[ Failed to fetch logs ]';
+                    if (_lastLogText !== errMsg) {
+                        panel.innerText = errMsg;
+                        _lastLogText = errMsg;
+                    }
+                }
+            } finally {
+                _logFetching = false;
+                panel.classList.remove('log-refreshing');
+            }
+        }
+
+        // Perform Service Action
+        async function performAction(action) {
+            showFeedback(`INITIATING SEQUENCE: ${action.toUpperCase()}...`);
+
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = true;
+            document.getElementById('btnRestart').disabled = true;
+
+            try {
+                const res = await apiFetch(API_ACTION, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+
+                if (res.ok) {
+                    showFeedback(`SEQUENCE COMPLETE: ${action.toUpperCase()}`);
+                    setTimeout(() => refreshData(), 1200);
+                } else {
+                    const txt = await res.text();
+                    showFeedback(`ERROR: ${txt}`, true);
+                    setTimeout(() => fetchStatus(), 800);
+                }
+            } catch (err) {
+                showFeedback(`CONNECTION ERROR`, true);
+            } finally {
+                setTimeout(() => fetchStatus(), 1200);
+            }
+        }
+
+        // Install OpenVPN
+        async function performInstall() {
+            const btn = document.getElementById('btnInstall');
+            btn.disabled = true;
+            showFeedback('INSTALLING OPENVPN — this may take a moment...');
+            try {
+                const res = await apiFetch(API_INSTALL, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    showFeedback(data.message || 'Installation complete.');
+                    setTimeout(() => refreshData(), 1500);
+                } else {
+                    const txt = await res.text();
+                    showFeedback(`INSTALL FAILED: ${txt}`, true);
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showFeedback('CONNECTION ERROR during install', true);
+                btn.disabled = false;
+            }
+        }
+
+        function refreshData() {
+            fetchStatus();
+            fetchClients(); // also triggers renderProvisionedClients()
+            fetchLogs();
+            fetchSysInfo();
+        }
+
+        // -----------------------------------------------------------------------
+        // System Info
+        // -----------------------------------------------------------------------
+
+        function fmtBytes(b) {
+            if (!b) return '0 B';
+            const units = ['B','KB','MB','GB','TB'];
+            const i = Math.floor(Math.log(b) / Math.log(1024));
+            return (b / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+        }
+
+        function fmtUptime(secs) {
+            if (!secs) return '—';
+            const d = Math.floor(secs / 86400);
+            const h = Math.floor((secs % 86400) / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            const parts = [];
+            if (d) parts.push(d + 'd');
+            if (h) parts.push(h + 'h');
+            parts.push(m + 'm');
+            return parts.join(' ');
+        }
+
+        function barColor(pct, el) {
+            if (pct >= 90) el.style.background = 'linear-gradient(90deg,#ef4444,#b91c1c)';
+            else if (pct >= 70) el.style.background = 'linear-gradient(90deg,#f59e0b,#b45309)';
+        }
+
+        async function fetchSysInfo() {
+            try {
+                const res = await apiFetch(API_SYSINFO);
+                if (!res.ok) return;
+                const d = await res.json();
+
+                document.getElementById('siHostname').textContent = d.hostname || '—';
+                document.getElementById('siKernel').textContent   = d.kernel   || '—';
+                document.getElementById('siUptime').textContent   = fmtUptime(d.uptime_seconds);
+
+                const cpuPct = d.cpu_percent ?? 0;
+                document.getElementById('siCpuPct').textContent = cpuPct.toFixed(1) + '%';
+                const cpuBar = document.getElementById('siCpuBar');
+                cpuBar.style.width = Math.min(cpuPct, 100) + '%';
+                cpuBar.style.background = 'linear-gradient(90deg,#00f0ff,#0080aa)';
+                barColor(cpuPct, cpuBar);
+
+                const memPct = d.mem_percent ?? 0;
+                document.getElementById('siMemPct').textContent   = memPct.toFixed(1) + '%';
+                document.getElementById('siMemUsed').textContent  = fmtBytes(d.mem_used);
+                document.getElementById('siMemTotal').textContent = fmtBytes(d.mem_total);
+                const memBar = document.getElementById('siMemBar');
+                memBar.style.width = Math.min(memPct, 100) + '%';
+                memBar.style.background = 'linear-gradient(90deg,#10b981,#047857)';
+                barColor(memPct, memBar);
+
+                const diskPct = d.disk_percent ?? 0;
+                document.getElementById('siDiskPct').textContent   = diskPct.toFixed(1) + '%';
+                document.getElementById('siDiskUsed').textContent  = fmtBytes(d.disk_used);
+                document.getElementById('siDiskTotal').textContent = fmtBytes(d.disk_total);
+                const diskBar = document.getElementById('siDiskBar');
+                diskBar.style.width = Math.min(diskPct, 100) + '%';
+                diskBar.style.background = 'linear-gradient(90deg,#f59e0b,#b45309)';
+                barColor(diskPct, diskBar);
+            } catch (_) {}
+        }
+
+        // -----------------------------------------------------------------------
+        // Client Management
+        // -----------------------------------------------------------------------
+
+        function formatDate(iso) {
+            if (!iso) return '--';
+            try { return new Date(iso).toLocaleString(); } catch { return iso; }
+        }
+
+        function showClientFeedback(msg, isError = false) {
+            const el = document.getElementById('clientMgmtFeedback');
+            el.textContent = '> ' + msg;
+            el.className = `font-mono text-xs p-3 rounded bg-black/50 border ${
+                isError ? 'border-danger text-danger' : 'border-primary text-primary'
+            } block`;
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => { el.className = 'hidden'; }, 6000);
+        }
+
+        async function fetchProvisionedClients() {
+            const tbody = document.getElementById('provisionedClientsBody');
+            try {
+                const res = await apiFetch(API_CLIENTS_LIST);
+                _provisionedCache = await res.json();
+                renderProvisionedClients();
+            } catch (err) {
+                if (err.message !== 'Unauthorized') console.error('Failed to fetch provisioned clients', err);
+            }
+        }
+
+        let _provisionedCache = [];
+
+        function renderProvisionedClients() {
+            const tbody = document.getElementById('provisionedClientsBody');
+            const data = _provisionedCache;
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest">[ NO CLIENT PROFILES FOUND ]</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(c => {
+                const online = connectedClientNames.has(c.name);
+                const statusBadge = online
+                    ? `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono border border-success/50 text-success" style="background:rgba(16,185,129,0.07)">
+                            <span class="w-1.5 h-1.5 rounded-full bg-success" style="animation:pulse-glow-green 2s infinite"></span>
+                            ONLINE
+                       </span>`
+                    : `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono border border-gray-700 text-gray-500">
+                            <span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                            OFFLINE
+                       </span>`;
+
+                return `
+                    <tr class="group hover:bg-white/5 transition-colors border-l-2 ${ online ? 'border-success/60' : 'border-transparent' } hover:border-primary">
+                        <td class="p-4">
+                            <div class="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ${ online ? 'text-success' : 'text-primary/30 group-hover:text-primary' } transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                                <span class="font-mono text-sm ${ online ? 'text-white' : 'text-gray-400' }">${escapeHtml(c.name)}</span>
+                            </div>
+                        </td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-gray-500 font-mono text-xs">${formatDate(c.created)}</td>
+                        <td class="p-4">
+                            ${c.has_passphrase
+                                ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono border border-primary/40 text-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    encrypted
+                                   </span>`
+                                : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono border border-gray-700 text-gray-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                    </svg>
+                                    no passphrase
+                                   </span>`
+                            }
+                        </td>
+                        <td class="p-4">
+                            <div class="flex justify-end gap-2">
+                                <a href="${API_CLIENTS_DOWNLOAD}?name=${encodeURIComponent(c.name)}"
+                                   class="sci-fi-button sci-fi-button-primary px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase inline-flex items-center gap-1"
+                                   download="${escapeHtml(c.name)}.ovpn">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    .ovpn
+                                </a>
+                                <button onclick="confirmRevokeClient('${escapeHtml(c.name)}')"
+                                    class="sci-fi-button sci-fi-button-danger px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase inline-flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                    Revoke
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function createClient() {
+            const input = document.getElementById('newClientName');
+            const passphraseInput = document.getElementById('clientPassphrase');
+            const name = input.value.trim();
+            const passphrase = passphraseInput.value;
+
+            if (!name) { showClientFeedback('Please enter a client name.', true); return; }
+            if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) {
+                showClientFeedback('Invalid name. Use only letters, numbers, dash, or underscore.', true);
+                return;
+            }
+            if (passphrase && passphrase.length < 8) {
+                showClientFeedback('Passphrase must be at least 8 characters.', true);
+                return;
+            }
+
+            showClientFeedback('Generating certificate and profile — please wait...');
+            try {
+                const res = await apiFetch(API_CLIENTS_CREATE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, passphrase })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    showClientFeedback(data.message || `Client '${name}' created.`);
+                    input.value = '';
+                    passphraseInput.value = '';
+                    fetchProvisionedClients();
+                } else {
+                    const txt = await res.text();
+                    showClientFeedback('ERROR: ' + txt, true);
+                }
+            } catch (err) {
+                showClientFeedback('Connection error', true);
+            }
+        }
+
+        /* ── Animated Eye (Passphrase Toggle) ────────────────────── */
+        let _ppEyeOpen = false;
+        let _ppBlinkTimer = null;
+        const _PP_CHARS = '!@#$%^&*<>?/|ABCDEFabcdef0123456789~`$@!';
+
+        function _ppLidAnim(targetUpper, targetLower, durationMs, onComplete) {
+            const ul = document.getElementById('ppLidUp');
+            const ll = document.getElementById('ppLidDn');
+            if (!ul || !ll) { if (onComplete) onComplete(); return; }
+            const fromU = parseFloat(ul.dataset.y ?? '15');
+            const fromL = parseFloat(ll.dataset.y ?? '15');
+            let t0 = null;
+            function tick(t) {
+                if (!t0) t0 = t;
+                let p = Math.min((t - t0) / durationMs, 1);
+                p = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2; // ease-in-out
+                const uy = fromU + (targetUpper - fromU) * p;
+                const ly = fromL + (targetLower - fromL) * p;
+                ul.setAttribute('d', `M1,15 Q25,${uy.toFixed(2)} 49,15 L49,-3 L1,-3 Z`);
+                ul.dataset.y = uy;
+                ll.setAttribute('d', `M1,15 Q25,${ly.toFixed(2)} 49,15 L49,33 L1,33 Z`);
+                ll.dataset.y = ly;
+                if (p < 1) requestAnimationFrame(tick);
+                else if (onComplete) onComplete();
+            }
+            requestAnimationFrame(tick);
+        }
+
+        function _ppOpenEye() {
+            _ppEyeOpen = true;
+            document.getElementById('eyeSvg')?.classList.add('eye-open');
+            _ppLidAnim(2, 28, 300, _ppScheduleBlink);
+            if (window.gsap) {
+                gsap.to('#ppPupil',      { duration: 0.4, attr: { r: 3.2 }, ease: 'power2.out' });
+                gsap.to('#ppPupilInner', { duration: 0.4, attr: { r: 1.8 }, ease: 'power2.out' });
+                gsap.to('#ppIris',       { duration: 0.35, attr: { r: 9 }, ease: 'back.out(1.7)' });
+            }
+        }
+
+        function _ppCloseEye() {
+            _ppEyeOpen = false;
+            document.getElementById('eyeSvg')?.classList.remove('eye-open');
+            if (_ppBlinkTimer) { clearTimeout(_ppBlinkTimer); _ppBlinkTimer = null; }
+            _ppLidAnim(15, 15, 250);
+            if (window.gsap) {
+                gsap.to('#ppPupil',      { duration: 0.22, attr: { r: 5 }, ease: 'power2.in' });
+                gsap.to('#ppPupilInner', { duration: 0.22, attr: { r: 2.5 }, ease: 'power2.in' });
+                gsap.to('#ppIris',       { duration: 0.22, attr: { r: 8 }, ease: 'power2.in' });
+            }
+        }
+
+        function _ppBlink() {
+            if (!_ppEyeOpen) return;
+            _ppLidAnim(15, 15, 70, () => _ppLidAnim(2, 28, 110, _ppScheduleBlink));
+        }
+
+        function _ppScheduleBlink() {
+            if (!_ppEyeOpen) return;
+            _ppBlinkTimer = setTimeout(_ppBlink, 1800 + Math.random() * 4500);
+        }
+
+        function _ppInitTracking() {
+            document.addEventListener('mousemove', e => {
+                if (!_ppEyeOpen || !window.gsap) return;
+                const svg = document.getElementById('eyeSvg');
+                if (!svg) return;
+                const r = svg.getBoundingClientRect();
+                const dx = e.clientX - (r.left + r.width  / 2);
+                const dy = e.clientY - (r.top  + r.height / 2);
+                const angle = Math.atan2(dy, dx);
+                const move  = Math.min(Math.hypot(dx, dy) / 55, 3.5);
+                const px = 25 + Math.cos(angle) * move;
+                const py = 15 + Math.sin(angle) * move * 0.55;
+                const opts = { duration: 0.15, ease: 'power1.out', overwrite: 'auto' };
+                gsap.to('#ppPupil',      { ...opts, attr: { cx: px, cy: py } });
+                gsap.to('#ppPupilInner', { ...opts, attr: { cx: px, cy: py } });
+                gsap.to('#ppHL1',        { ...opts, attr: { cx: px + 2.5, cy: py - 3.5 } });
+                gsap.to('#ppHL2',        { ...opts, attr: { cx: px + 5,   cy: py - 1   } });
+            });
+        }
+
+        function _ppScrambleReveal(input) {
+            const real = input.value;
+            if (!real) { input.type = 'text'; return; }
+            input.type = 'text';
+            let iter = 0;
+            const maxIter = real.length * 3;
+            const iv = setInterval(() => {
+                input.value = real.split('').map((ch, i) =>
+                    i < Math.floor(iter / 3) ? ch : _PP_CHARS[Math.floor(Math.random() * _PP_CHARS.length)]
+                ).join('');
+                if (++iter > maxIter) { clearInterval(iv); input.value = real; }
+            }, 28);
+        }
+
+        function _ppScrambleHide(input) {
+            const real = input.value;
+            if (!real) { input.type = 'password'; return; }
+            let iter = 0;
+            const maxIter = real.length * 3;
+            const iv = setInterval(() => {
+                input.value = real.split('').map((ch, i) =>
+                    i >= real.length - Math.floor(iter / 3)
+                        ? _PP_CHARS[Math.floor(Math.random() * _PP_CHARS.length)]
+                        : ch
+                ).join('');
+                if (++iter > maxIter) { clearInterval(iv); input.type = 'password'; input.value = real; }
+            }, 28);
+        }
+
+        function togglePassphraseVisibility() {
+            const input = document.getElementById('clientPassphrase');
+            _ppEyeOpen = !_ppEyeOpen;
+            if (_ppEyeOpen) { _ppOpenEye();  _ppScrambleReveal(input); }
+            else            { _ppCloseEye(); _ppScrambleHide(input);   }
+        }
+
+        function confirmRevokeClient(name) {
+            if (!confirm(`Revoke client '${name}'?\n\nThis will invalidate their certificate and remove the .ovpn profile.`)) return;
+            revokeClient(name);
+        }
+
+        async function revokeClient(name) {
+            showClientFeedback(`Revoking '${name}'...`);
+            try {
+                const res = await apiFetch(API_CLIENTS_REVOKE, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    showClientFeedback(data.message || `Client '${name}' revoked.`);
+                    fetchProvisionedClients();
+                } else {
+                    const txt = await res.text();
+                    showClientFeedback('REVOKE FAILED: ' + txt, true);
+                }
+            } catch (err) {
+                showClientFeedback('Connection error', true);
+            }
+        }
+
+        // Initial Load
+        document.addEventListener('DOMContentLoaded', () => {
+            AOS.init({ duration: 600, once: true, easing: 'ease-out-quart' });
+            // Init animated eye — start closed (password hidden)
+            const ul = document.getElementById('ppLidUp');
+            const ll = document.getElementById('ppLidDn');
+            if (ul) { ul.setAttribute('d', 'M1,15 Q25,15 49,15 L49,-3 L1,-3 Z'); ul.dataset.y = '15'; }
+            if (ll) { ll.setAttribute('d', 'M1,15 Q25,15 49,15 L49,33 L1,33 Z');  ll.dataset.y = '15'; }
+            _ppInitTracking();
+
+            fetchProvisionedClients();
+            fetchGroups();
+            refreshData();
+            setInterval(refreshData, 8000);
+            setInterval(fetchProvisionedClients, 30000);
+            setInterval(fetchGroups, 30000);
+        });
+
+        // -----------------------------------------------------------------------
+        // Group Management
+        // -----------------------------------------------------------------------
+        const API_GROUPS = '/api/groups';
+
+        let _groupsCache = [];
+        let _activeGroupID = null;
+
+        function showGroupFeedback(msg, isError = false) {
+            const el = document.getElementById('groupFeedback');
+            el.textContent = '> ' + msg;
+            el.className = `font-mono text-xs p-3 rounded bg-black/50 border ${
+                isError ? 'border-danger text-danger' : 'border-primary text-primary'
+            } block`;
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => { el.className = 'hidden'; }, 6000);
+        }
+
+        function showModalFeedback(msg, isError = false) {
+            const el = document.getElementById('groupModalFeedback');
+            el.textContent = '> ' + msg;
+            el.className = `font-mono text-xs p-3 rounded bg-black/50 border ${
+                isError ? 'border-danger text-danger' : 'border-primary text-primary'
+            } block`;
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => { el.className = 'hidden'; }, 5000);
+        }
+
+        async function fetchGroups() {
+            try {
+                const res = await apiFetch(API_GROUPS);
+                _groupsCache = await res.json();
+                renderGroupsList();
+            } catch (err) {
+                if (err.message !== 'Unauthorized') console.error('Failed to fetch groups', err);
+            }
+        }
+
+        function renderGroupsList() {
+            const container = document.getElementById('groupsList');
+            if (!_groupsCache || _groupsCache.length === 0) {
+                container.innerHTML = `<div class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest">[ NO GROUPS DEFINED ]</div>`;
+                return;
+            }
+
+            container.innerHTML = _groupsCache.map(g => {
+                const memberCount = (g.members || []).length;
+                const ruleCount   = (g.rules   || []).length;
+                return `
+                <div class="sci-fi-card border-gray-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/40 transition-all">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
+                             style="background:rgba(0,240,255,0.07);border:1px solid rgba(0,240,255,0.2);">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="font-mono text-sm text-gray-200">${escapeHtml(g.name)}</p>
+                            <p class="font-mono text-xs text-gray-600 mt-0.5">
+                                <span class="text-primary">${memberCount}</span> member${memberCount !== 1 ? 's' : ''}
+                                &nbsp;·&nbsp;
+                                <span class="text-primary">${ruleCount}</span> rule${ruleCount !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 justify-end">
+                        <button onclick="openGroupModal('${g.id}')"
+                            class="sci-fi-button sci-fi-button-primary px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Manage
+                        </button>
+                        <button onclick="confirmDeleteGroup('${g.id}', '${escapeHtml(g.name).replace(/'/g, "\\'")}')"
+                            class="sci-fi-button sci-fi-button-danger px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        async function createGroup() {
+            const input = document.getElementById('newGroupName');
+            const name = input.value.trim();
+            if (!name) { showGroupFeedback('Please enter a group name.', true); return; }
+
+            try {
+                const res = await apiFetch(API_GROUPS, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const g = await res.json();
+                    showGroupFeedback(`Group '${escapeHtml(g.name)}' created.`);
+                    input.value = '';
+                    fetchGroups();
+                } else {
+                    const txt = await res.text();
+                    showGroupFeedback('ERROR: ' + txt, true);
+                }
+            } catch (err) { showGroupFeedback('Connection error', true); }
+        }
+
+        async function confirmDeleteGroup(id, name) {
+            if (!confirm(`Delete group '${name}'?\n\nThis will remove the group and all its rules. Client profiles are NOT affected.`)) return;
+            try {
+                const res = await apiFetch(`${API_GROUPS}/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showGroupFeedback(`Group deleted.`);
+                    fetchGroups();
+                } else {
+                    const txt = await res.text();
+                    showGroupFeedback('ERROR: ' + txt, true);
+                }
+            } catch (err) { showGroupFeedback('Connection error', true); }
+        }
+
+        // --- Group Modal ---
+
+        function openGroupModal(groupID) {
+            _activeGroupID = groupID;
+            const g = _groupsCache.find(x => x.id === groupID);
+            if (!g) return;
+            document.getElementById('groupModalTitle').textContent = 'Group: ' + g.name;
+
+            // Populate member select with all known provisioned clients
+            const sel = document.getElementById('gmAddMemberSel');
+            sel.innerHTML = '<option value="">-- select client --</option>';
+            (_provisionedCache || []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name;
+                sel.appendChild(opt);
+            });
+
+            renderModalMembers(g);
+            renderModalRules(g);
+            document.getElementById('groupModalFeedback').className = 'hidden';
+            document.getElementById('groupModal').classList.remove('hidden');
+        }
+
+        function closeGroupModal() {
+            document.getElementById('groupModal').classList.add('hidden');
+            _activeGroupID = null;
+        }
+
+        function renderModalMembers(g) {
+            const container = document.getElementById('groupModalMembers');
+            const members = g.members || [];
+            if (members.length === 0) {
+                container.innerHTML = '<span class="text-gray-600 font-mono text-xs">No members</span>';
+                return;
+            }
+            container.innerHTML = members.map(m => {
+                const online = connectedClientNames.has(m);
+                return `
+                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono border
+                    ${online ? 'border-success/50 text-success' : 'border-gray-700 text-gray-400'}">
+                    <span class="w-1.5 h-1.5 rounded-full ${online ? 'bg-success' : 'bg-gray-600'}"></span>
+                    ${escapeHtml(m)}
+                    <button onclick="gmRemoveMember('${escapeHtml(m)}')"
+                        class="ml-1 opacity-50 hover:opacity-100 hover:text-danger transition-all" title="Remove">&#x2715;</button>
+                </span>`;
+            }).join('');
+        }
+
+        function renderModalRules(g) {
+            const tbody = document.getElementById('groupModalRulesBody');
+            const rules = g.rules || [];
+            if (rules.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-600 font-mono text-xs tracking-widest">[ NO RULES ]</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = rules.map(ru => {
+                const ac = ru.action === 'ACCEPT' ? 'text-success border-success/40' : 'text-danger border-danger/40';
+                return `
+                <tr class="group hover:bg-white/5 transition-colors">
+                    <td class="p-3 font-mono text-gray-300">${escapeHtml(ru.proto)}</td>
+                    <td class="p-3 font-mono text-gray-300">${escapeHtml(ru.dest)}</td>
+                    <td class="p-3 font-mono text-gray-400">${ru.dest_port ? escapeHtml(ru.dest_port) : '<span class="text-gray-600">any</span>'}</td>
+                    <td class="p-3">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded border font-mono text-xs ${ac}">
+                            ${escapeHtml(ru.action)}
+                        </span>
+                    </td>
+                    <td class="p-3 text-gray-500 font-mono text-xs">${escapeHtml(ru.comment)}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="gmDeleteRule('${ru.id}')"
+                            class="text-gray-600 hover:text-danger transition-colors font-mono text-xs">&#x2715;</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function _saveMembers(members) {
+            const res = await apiFetch(`${API_GROUPS}/${_activeGroupID}/members`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ members })
+            });
+            if (!res.ok) {
+                const txt = await res.text();
+                showModalFeedback('ERROR: ' + txt, true);
+                return false;
+            }
+            const updated = await res.json();
+            const idx = _groupsCache.findIndex(x => x.id === _activeGroupID);
+            if (idx !== -1) _groupsCache[idx] = updated;
+            renderGroupsList();
+            renderModalMembers(updated);
+            return true;
+        }
+
+        async function gmAddMember() {
+            const sel = document.getElementById('gmAddMemberSel');
+            const name = sel.value;
+            if (!name) { showModalFeedback('Select a client first.', true); return; }
+
+            const g = _groupsCache.find(x => x.id === _activeGroupID);
+            if (!g) return;
+            if ((g.members || []).includes(name)) {
+                showModalFeedback(`'${escapeHtml(name)}' is already in this group.`, true);
+                return;
+            }
+            const newMembers = [...(g.members || []), name];
+            if (await _saveMembers(newMembers)) {
+                sel.value = '';
+                showModalFeedback(`'${escapeHtml(name)}' added to group.`);
+            }
+        }
+
+        async function gmRemoveMember(name) {
+            const g = _groupsCache.find(x => x.id === _activeGroupID);
+            if (!g) return;
+            const newMembers = (g.members || []).filter(m => m !== name);
+            if (await _saveMembers(newMembers)) {
+                showModalFeedback(`'${escapeHtml(name)}' removed from group.`);
+            }
+        }
+
+        async function gmAddRule() {
+            const proto   = document.getElementById('gmRuleProto').value;
+            const dest    = document.getElementById('gmRuleDest').value.trim();
+            const port    = document.getElementById('gmRulePort').value.trim();
+            const action  = document.getElementById('gmRuleAction').value;
+            const comment = document.getElementById('gmRuleComment').value.trim();
+
+            if (!dest) { showModalFeedback('Destination CIDR/IP is required.', true); return; }
+
+            try {
+                const res = await apiFetch(`${API_GROUPS}/${_activeGroupID}/rules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proto, dest, dest_port: port, action, comment })
+                });
+                if (res.ok) {
+                    const rule = await res.json();
+                    const idx = _groupsCache.findIndex(x => x.id === _activeGroupID);
+                    if (idx !== -1) {
+                        _groupsCache[idx].rules = [...(_groupsCache[idx].rules || []), rule];
+                        renderGroupsList();
+                        renderModalRules(_groupsCache[idx]);
+                    }
+                    document.getElementById('gmRuleDest').value = '';
+                    document.getElementById('gmRulePort').value = '';
+                    document.getElementById('gmRuleComment').value = '';
+                    showModalFeedback('Rule added.');
+                } else {
+                    const txt = await res.text();
+                    showModalFeedback('ERROR: ' + txt, true);
+                }
+            } catch (err) { showModalFeedback('Connection error', true); }
+        }
+
+        async function gmDeleteRule(ruleID) {
+            try {
+                const res = await apiFetch(`${API_GROUPS}/${_activeGroupID}/rules/${ruleID}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    const idx = _groupsCache.findIndex(x => x.id === _activeGroupID);
+                    if (idx !== -1) {
+                        _groupsCache[idx].rules = (_groupsCache[idx].rules || []).filter(r => r.id !== ruleID);
+                        renderGroupsList();
+                        renderModalRules(_groupsCache[idx]);
+                    }
+                    showModalFeedback('Rule deleted.');
+                } else {
+                    const txt = await res.text();
+                    showModalFeedback('ERROR: ' + txt, true);
+                }
+            } catch (err) { showModalFeedback('Connection error', true); }
+        }
+
+    </script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+</body>
+</html>
+

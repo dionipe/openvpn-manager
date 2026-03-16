@@ -1,0 +1,20 @@
+# OpenVPN Manager Configuration
+# TOON (Token-Oriented Object Notation) — https://toonformat.dev/
+#
+# To update the password hash:
+#   cd /opt/openvpn-web-ui && ./openvpn-manager --hash-pass <your-new-password>
+#   Then replace the admin_pass value below with the output.
+#
+# Environment variables (OVPN_USER, OVPN_PASS, OVPN_SERVICE, OVPN_PUBLIC_IP)
+# always override values in this file when set.
+
+admin_user: admin
+admin_pass: $2a$12$edhix1hhTxNxqL8/L0r7V.LAH5ZdkSqHTMQe8fXm90VzTowAO4kGG
+ovpn_service: openvpn-server@server
+public_ip: 103.142.214.62
+session_ttl: 24h
+
+paths:
+  easy_rsa: /etc/openvpn/easy-rsa
+  clients: /etc/openvpn/clients
+  server_certs: /etc/openvpn/server

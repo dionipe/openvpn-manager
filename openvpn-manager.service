@@ -1,0 +1,33 @@
+[Unit]
+Description=OpenVPN Web Manager
+Documentation=https://github.com/dionipe/openvpn-manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/openvpn-web-ui
+
+# Per-server overrides: edit /etc/openvpn/manager.env
+# The '-' prefix means: do NOT fail if the file doesn't exist yet.
+EnvironmentFile=-/etc/openvpn/manager.env
+
+ExecStart=/opt/openvpn-web-ui/openvpn-manager
+Restart=on-failure
+RestartSec=5s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openvpn-manager
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/etc/openvpn /var/log/openvpn
+
+[Install]
+WantedBy=multi-user.target
