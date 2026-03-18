@@ -27,7 +27,7 @@ SyslogIdentifier=openvpn-manager
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
-ReadWritePaths=/etc/openvpn /var/log/openvpn
+ReadWritePaths=/etc/openvpn /var/log/openvpn /etc/wireguard
 
 [Install]
 WantedBy=multi-user.target

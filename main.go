@@ -394,6 +394,7 @@ func main() {
 	loadEnvFile(envFile) // load manager.env FIRST so env vars are set before anything else
 	loadConfig()
 	loadGroups()
+	loadWGPeers()
 
 	// Re-read env vars that may have been set by loadEnvFile after package init
 	if v := os.Getenv("OVPN_USER"); v != "" {
@@ -410,6 +411,31 @@ func main() {
 	}
 	if v := os.Getenv("OVPN_PORT"); v != "" {
 		listenPort = v
+	}
+
+	// WireGuard env overrides
+	if v := os.Getenv("WG_INTERFACE"); v != "" {
+		wgInterface = v
+		wgService = "wg-quick@" + v
+		wgConfigFile = "/etc/wireguard/" + v + ".conf"
+	}
+	if v := os.Getenv("WG_CONFIG"); v != "" {
+		wgConfigFile = v
+	}
+	if v := os.Getenv("WG_CLIENTS_DIR"); v != "" {
+		wgClientsDir = v
+	}
+	if v := os.Getenv("WG_SERVICE"); v != "" {
+		wgService = v
+	}
+	if v := os.Getenv("WG_ENDPOINT"); v != "" {
+		wgEndpoint = v
+	}
+	if v := os.Getenv("WG_DNS"); v != "" {
+		wgDNS = v
+	}
+	if v := os.Getenv("WG_ALLOWED_IPS"); v != "" {
+		wgAllowedIPs = v
 	}
 
 	// Auto-detect public IP if still empty after all config sources
@@ -474,6 +500,17 @@ func main() {
 			http.Error(w, "Not found", http.StatusNotFound)
 		}
 	})
+
+	// WireGuard routes
+	mux.HandleFunc("/api/wg/status", handleWGStatus)
+	mux.HandleFunc("/api/wg/action", handleWGAction)
+	mux.HandleFunc("/api/wg/install", handleWGInstall)
+	mux.HandleFunc("/api/wg/clients", handleWGConnectedClients)
+	mux.HandleFunc("/api/wg/logs", handleWGLogs)
+	mux.HandleFunc("/api/wg/peers/create", handleWGClientCreate)
+	mux.HandleFunc("/api/wg/peers/list", handleWGClientList)
+	mux.HandleFunc("/api/wg/peers/download", handleWGClientDownload)
+	mux.HandleFunc("/api/wg/peers/revoke", handleWGClientRevoke)
 
 	fmt.Printf("Server starting on http://localhost%s\n", listenPort)
 	log.Printf("[config] public_ip=%s  service=%s  port=%s", serverPublicIP, ovpnService, listenPort)
@@ -1266,6 +1303,571 @@ func handleDownloadClient(w http.ResponseWriter, r *http.Request) {
 
 // groupsFile is where group definitions are persisted.
 const groupsFile = "/etc/openvpn/manager-groups.json"
+
+// ---------------------------------------------------------------------------
+// WireGuard
+// ---------------------------------------------------------------------------
+
+// wgPeersFile persists the list of provisioned WireGuard peers.
+const wgPeersFile = "/etc/wireguard/manager-peers.json"
+
+var (
+	wgInterface  = getEnv("WG_INTERFACE", "wg0")
+	wgConfigFile = getEnv("WG_CONFIG", "/etc/wireguard/wg0.conf")
+	wgClientsDir = getEnv("WG_CLIENTS_DIR", "/etc/wireguard/clients")
+	wgService    = getEnv("WG_SERVICE", "wg-quick@wg0")
+	wgEndpoint   = getEnv("WG_ENDPOINT", "")    // host:port, e.g. "1.2.3.4:51820"
+	wgDNS        = getEnv("WG_DNS", "1.1.1.1")  // DNS for peer configs
+	wgAllowedIPs = getEnv("WG_ALLOWED_IPS", "0.0.0.0/0, ::/0")
+)
+
+// WGPeer is metadata for a provisioned WireGuard peer (stored in the peers JSON file).
+type WGPeer struct {
+	Name      string `json:"name"`
+	PublicKey string `json:"public_key"`
+	IP        string `json:"ip"`   // assigned VPN IP, e.g. "10.8.1.2/32"
+	Created   string `json:"created"`
+}
+
+var (
+	wgPeersMu sync.RWMutex
+	wgPeers   []WGPeer
+)
+
+func loadWGPeers() {
+	wgPeersMu.Lock()
+	defer wgPeersMu.Unlock()
+	data, err := os.ReadFile(wgPeersFile)
+	if err != nil {
+		wgPeers = []WGPeer{}
+		return
+	}
+	if err := json.Unmarshal(data, &wgPeers); err != nil {
+		wgPeers = []WGPeer{}
+	}
+}
+
+func saveWGPeers() error {
+	data, err := json.MarshalIndent(wgPeers, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll("/etc/wireguard", 0750); err != nil {
+		return err
+	}
+	return os.WriteFile(wgPeersFile, data, 0640)
+}
+
+// isWireGuardInstalled checks for wg and wg-quick binaries.
+func isWireGuardInstalled() bool {
+	for _, p := range []string{"/usr/bin/wg", "/usr/sbin/wg", "/bin/wg"} {
+		if _, err := os.Stat(p); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// handleWGStatus returns the WireGuard service status alongside install state.
+func handleWGStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type WGStatus struct {
+		Active    bool   `json:"active"`
+		Status    string `json:"status"`
+		Installed bool   `json:"installed"`
+		Message   string `json:"message,omitempty"`
+	}
+
+	installed := isWireGuardInstalled()
+	resp := WGStatus{Installed: installed}
+
+	if !installed {
+		resp.Active = false
+		resp.Status = "not_installed"
+		resp.Message = "WireGuard is not installed on this system."
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	cmd := exec.Command("systemctl", "is-active", wgService)
+	if err := cmd.Run(); err == nil {
+		resp.Active = true
+		resp.Status = "active"
+	} else {
+		checkFailed := exec.Command("systemctl", "is-failed", wgService)
+		if checkFailed.Run() == nil {
+			resp.Status = "failed"
+			resp.Message = fmt.Sprintf("The %s service has failed. Check logs for details.", wgService)
+		} else {
+			resp.Status = "inactive"
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// handleWGAction performs start/stop/restart on the wg-quick service.
+func handleWGAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	if req.Action != "start" && req.Action != "stop" && req.Action != "restart" {
+		http.Error(w, "Invalid action", http.StatusBadRequest)
+		return
+	}
+	if !isWireGuardInstalled() {
+		http.Error(w, "WireGuard is not installed.", http.StatusServiceUnavailable)
+		return
+	}
+
+	cmd := exec.Command("sudo", "systemctl", req.Action, wgService)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to execute action: %v\n%s", err, string(out)), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Action executed successfully"})
+}
+
+// handleWGInstall installs wireguard via apt-get.
+func handleWGInstall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if isWireGuardInstalled() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "WireGuard is already installed."})
+		return
+	}
+	cmd := exec.Command("sudo", "apt-get", "install", "-y", "wireguard")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Installation failed: %v\n%s", err, string(out)), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "WireGuard installed successfully."})
+}
+
+// handleWGConnectedClients lists currently connected peers via `wg show`.
+func handleWGConnectedClients(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type WGConnected struct {
+		PublicKey       string `json:"public_key"`
+		Endpoint        string `json:"endpoint"`
+		AllowedIPs      string `json:"allowed_ips"`
+		LatestHandshake string `json:"latest_handshake"`
+		BytesReceived   string `json:"bytes_received"`
+		BytesSent       string `json:"bytes_sent"`
+		Name            string `json:"name"`
+	}
+
+	out, err := exec.Command("sudo", "wg", "show", wgInterface, "dump").Output()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]WGConnected{})
+		return
+	}
+
+	// Build a map public_key -> peer name from persisted metadata
+	wgPeersMu.RLock()
+	nameByKey := map[string]string{}
+	for _, p := range wgPeers {
+		nameByKey[p.PublicKey] = p.Name
+	}
+	wgPeersMu.RUnlock()
+
+	var connected []WGConnected
+	for i, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if i == 0 {
+			continue // first line is the server (interface) itself
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 7 {
+			continue
+		}
+		pubKey := fields[0]
+		c := WGConnected{
+			PublicKey:       pubKey,
+			Endpoint:        fields[2],
+			AllowedIPs:      fields[3],
+			LatestHandshake: fields[4],
+			BytesReceived:   fields[5],
+			BytesSent:       fields[6],
+			Name:            nameByKey[pubKey],
+		}
+		connected = append(connected, c)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(connected)
+}
+
+// nextWGIP finds the next unused /32 peer IP in the 10.8.1.0/24 range
+// (or whatever subnet the server is using), starting at .2.
+func nextWGIP() (string, error) {
+	wgPeersMu.RLock()
+	used := map[string]bool{}
+	for _, p := range wgPeers {
+		used[strings.TrimSuffix(p.IP, "/32")] = true
+	}
+	wgPeersMu.RUnlock()
+
+	for i := 2; i <= 254; i++ {
+		ip := fmt.Sprintf("10.8.1.%d", i)
+		if !used[ip] {
+			return ip + "/32", nil
+		}
+	}
+	return "", fmt.Errorf("no free IP addresses in 10.8.1.0/24")
+}
+
+// runWGCmd runs a wg sub-command and returns combined output.
+func runWGCmd(args ...string) ([]byte, error) {
+	cmd := exec.Command("sudo", append([]string{"wg"}, args...)...)
+	return cmd.CombinedOutput()
+}
+
+// handleWGClientCreate generates a new WireGuard peer key-pair, assigns an IP,
+// adds the peer to the live interface (wg set) and appends it to the server
+// config file, then returns a client .conf file for download.
+func handleWGClientCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if !isValidClientName(name) {
+		http.Error(w, "Invalid peer name. Use only letters, numbers, dash, or underscore (max 64 chars).", http.StatusBadRequest)
+		return
+	}
+
+	// Ensure client dir exists
+	if err := os.MkdirAll(wgClientsDir, 0750); err != nil {
+		http.Error(w, "Failed to create WireGuard clients directory", http.StatusInternalServerError)
+		return
+	}
+
+	outPath := fmt.Sprintf("%s/%s.conf", wgClientsDir, name)
+	if _, err := os.Stat(outPath); err == nil {
+		http.Error(w, fmt.Sprintf("Peer '%s' already exists.", name), http.StatusConflict)
+		return
+	}
+
+	// Generate peer private + public key
+	privOut, err := exec.Command("sudo", "bash", "-c", "wg genkey").Output()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("wg genkey failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	privKey := strings.TrimSpace(string(privOut))
+
+	pubCmd := exec.Command("sudo", "bash", "-c", fmt.Sprintf("echo '%s' | wg pubkey", privKey))
+	pubOut, err := pubCmd.Output()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("wg pubkey failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	pubKey := strings.TrimSpace(string(pubOut))
+
+	// Assign IP
+	peerIP, err := nextWGIP()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Determine endpoint for the client config
+	endpoint := wgEndpoint
+	if endpoint == "" {
+		endpoint = serverPublicIP + ":51820"
+	}
+
+	// Read server public key from config
+	serverPubKey := ""
+	if confData, err2 := os.ReadFile(wgConfigFile); err2 == nil {
+		for _, line := range strings.Split(string(confData), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "PublicKey") || strings.HasPrefix(line, "# ServerPublicKey") {
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					serverPubKey = strings.TrimSpace(parts[1])
+					break
+				}
+			}
+		}
+	}
+	// Fallback: derive from server private key
+	if serverPubKey == "" {
+		if confData, err2 := os.ReadFile(wgConfigFile); err2 == nil {
+			for _, line := range strings.Split(string(confData), "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "PrivateKey") {
+					parts := strings.SplitN(line, "=", 2)
+					if len(parts) == 2 {
+						sPriv := strings.TrimSpace(parts[1])
+						pcmd := exec.Command("sudo", "bash", "-c", fmt.Sprintf("echo '%s' | wg pubkey", sPriv))
+						if po, e := pcmd.Output(); e == nil {
+							serverPubKey = strings.TrimSpace(string(po))
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Build client .conf content
+	clientConf := fmt.Sprintf("[Interface]\nPrivateKey = %s\nAddress = %s\nDNS = %s\n\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\nEndpoint = %s\nPersistentKeepalive = 25\n",
+		privKey,
+		peerIP,
+		wgDNS,
+		serverPubKey,
+		wgAllowedIPs,
+		endpoint,
+	)
+
+	if err := os.WriteFile(outPath, []byte(clientConf), 0640); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to write client config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Add peer to the running WireGuard interface
+	peerIPHost := strings.TrimSuffix(peerIP, "/32") + "/32"
+	addCmd := exec.Command("sudo", "wg", "set", wgInterface, "peer", pubKey, "allowed-ips", peerIPHost)
+	if out, err2 := addCmd.CombinedOutput(); err2 != nil {
+		log.Printf("[wg] wg set peer failed (interface may be down): %v\n%s", err2, string(out))
+		// Non-fatal — peer saved in config, will be active after next wg-quick up
+	}
+
+	// Append [Peer] block to server wg0.conf
+	peerBlock := fmt.Sprintf("\n# Peer: %s\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\n", name, pubKey, peerIPHost)
+	f, err := os.OpenFile(wgConfigFile, os.O_APPEND|os.O_WRONLY, 0640)
+	if err != nil {
+		log.Printf("[wg] failed to append peer to %s: %v", wgConfigFile, err)
+	} else {
+		f.WriteString(peerBlock)
+		f.Close()
+	}
+
+	// Persist metadata
+	wgPeersMu.Lock()
+	wgPeers = append(wgPeers, WGPeer{
+		Name:      name,
+		PublicKey: pubKey,
+		IP:        peerIP,
+		Created:   time.Now().UTC().Format(time.RFC3339),
+	})
+	saveWGPeers()
+	wgPeersMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": fmt.Sprintf("Peer '%s' created successfully.", name),
+		"name":    name,
+	})
+}
+
+// handleWGClientList returns all provisioned WireGuard peers (metadata).
+func handleWGClientList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	wgPeersMu.RLock()
+	defer wgPeersMu.RUnlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(wgPeers)
+}
+
+// handleWGClientDownload serves the peer .conf file as a download.
+func handleWGClientDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	name := r.URL.Query().Get("name")
+	if !isValidClientName(name) {
+		http.Error(w, "Invalid peer name", http.StatusBadRequest)
+		return
+	}
+	confPath := fmt.Sprintf("%s/%s.conf", wgClientsDir, name)
+	data, err := os.ReadFile(confPath)
+	if err != nil {
+		http.Error(w, "Peer not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.conf"`, name))
+	w.Write(data)
+}
+
+// handleWGClientRevoke removes a peer from the server config and the running interface.
+func handleWGClientRevoke(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if !isValidClientName(name) {
+		http.Error(w, "Invalid peer name", http.StatusBadRequest)
+		return
+	}
+
+	// Find public key
+	wgPeersMu.Lock()
+	defer wgPeersMu.Unlock()
+
+	peerIdx := -1
+	for i, p := range wgPeers {
+		if p.Name == name {
+			peerIdx = i
+			break
+		}
+	}
+	if peerIdx == -1 {
+		http.Error(w, "Peer not found", http.StatusNotFound)
+		return
+	}
+	pubKey := wgPeers[peerIdx].PublicKey
+
+	// Remove from running interface (best-effort)
+	rmCmd := exec.Command("sudo", "wg", "set", wgInterface, "peer", pubKey, "remove")
+	if out, err := rmCmd.CombinedOutput(); err != nil {
+		log.Printf("[wg] wg set peer remove failed: %v\n%s", err, string(out))
+	}
+
+	// Remove [Peer] block from server config file
+	if data, err := os.ReadFile(wgConfigFile); err == nil {
+		updated := removeWGPeerBlock(string(data), pubKey)
+		os.WriteFile(wgConfigFile, []byte(updated), 0640)
+	}
+
+	// Remove client .conf file
+	os.Remove(fmt.Sprintf("%s/%s.conf", wgClientsDir, name))
+
+	// Remove from metadata
+	wgPeers = append(wgPeers[:peerIdx], wgPeers[peerIdx+1:]...)
+	saveWGPeers()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": fmt.Sprintf("Peer '%s' revoked successfully.", name),
+	})
+}
+
+// removeWGPeerBlock strips the [Peer] section with the given public key from
+// a WireGuard config string, including the preceding "# Peer: …" comment.
+func removeWGPeerBlock(conf, pubKey string) string {
+	lines := strings.Split(conf, "\n")
+	result := []string{}
+	skip := false
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[Peer]") {
+			// Peek ahead to see if this block's PublicKey matches
+			found := false
+			for j := i + 1; j < len(lines) && j < i+10; j++ {
+				t := strings.TrimSpace(lines[j])
+				if strings.HasPrefix(t, "[") && t != "[Peer]" {
+					break
+				}
+				if strings.HasPrefix(t, "PublicKey") {
+					parts := strings.SplitN(t, "=", 2)
+					if len(parts) == 2 && strings.TrimSpace(parts[1]) == pubKey {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				// Also remove the preceding "# Peer: …" comment if present
+				if len(result) > 0 && strings.HasPrefix(strings.TrimSpace(result[len(result)-1]), "# Peer:") {
+					result = result[:len(result)-1]
+				}
+				skip = true
+			} else {
+				skip = false
+			}
+		}
+		if skip && strings.HasPrefix(trimmed, "[") && trimmed != "[Peer]" {
+			skip = false
+		}
+		if !skip {
+			result = append(result, line)
+		}
+	}
+	return strings.TrimRight(strings.Join(result, "\n"), "\n") + "\n"
+}
+
+// handleWGLogs returns WireGuard journal entries.
+func handleWGLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	lines := r.URL.Query().Get("lines")
+	if lines == "" {
+		lines = "50"
+	}
+	for _, c := range lines {
+		if c < '0' || c > '9' {
+			http.Error(w, "Invalid lines parameter", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var output []byte
+	var err error
+	if isWireGuardInstalled() {
+		cmd := exec.Command("journalctl", "-u", wgService, "-n", lines, "--no-pager", "--output=short-iso")
+		output, err = cmd.CombinedOutput()
+	} else {
+		output = []byte("WireGuard is not installed.")
+	}
+	if err != nil && len(output) == 0 {
+		output = []byte(fmt.Sprintf("journalctl error: %v", err))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"logs": string(output)})
+}
 
 // Rule represents an iptables-style network rule for a group.
 type Rule struct {

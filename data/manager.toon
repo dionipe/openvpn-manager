@@ -9,7 +9,7 @@
 # always override values in this file when set.
 
 admin_user: admin
-admin_pass: changeme
+admin_pass: Bijikuda
 ovpn_service: openvpn-server@server
 public_ip: 103.142.214.62
 session_ttl: 24h
@@ -18,3 +18,20 @@ paths:
   easy_rsa: /etc/openvpn/easy-rsa
   clients: /etc/openvpn/clients
   server_certs: /etc/openvpn/server
+
+# WireGuard settings (override via manager.env or environment variables)
+# wg_interface: wg0
+# wg_config: /etc/wireguard/wg0.conf
+# wg_clients_dir: /etc/wireguard/clients
+# wg_service: wg-quick@wg0
+# wg_endpoint: 103.142.214.62:51820
+# wg_dns: 1.1.1.1
+# wg_allowed_ips: 0.0.0.0/0, ::/0
+
+WG_INTERFACE=wg0
+WG_CONFIG=/etc/wireguard/wg0.conf
+WG_CLIENTS_DIR=/etc/wireguard/clients
+WG_SERVICE=wg-quick@wg0
+WG_ENDPOINT=103.142.214.62:51820      # host:port yang diekspos ke klien
+WG_DNS=1.1.1.1                        # DNS untuk konfigurasi peer
+WG_ALLOWED_IPS=0.0.0.0/0, ::/0       # Route yang di-tunnel (default: all traffic)

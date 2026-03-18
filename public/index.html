@@ -673,7 +673,200 @@
         </div>
     </section>
 
-    <!-- Group Management -->
+    <!-- WireGuard VPN -->
+    <section class="w-full max-w-6xl mx-auto mt-6 mb-10" data-aos="fade-up" data-aos-duration="600">
+        <div class="sci-fi-card border-gray-800 shadow-xl overflow-hidden">
+            <!-- Header -->
+            <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-surface">
+                <h2 class="text-lg font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                    <!-- WireGuard logo-like icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    WireGuard VPN
+                </h2>
+                <div class="flex items-center gap-3">
+                    <span id="wgStatusIndicator" class="status-dot not-installed"></span>
+                    <span id="wgStatusText" class="text-sm font-mono tracking-wider text-gray-500">LOADING...</span>
+                    <button onclick="fetchWGStatus(); fetchWGClients(); fetchWGPeers(); fetchWGLogs();"
+                        class="text-gray-500 hover:text-primary transition-colors focus:outline-none ml-2" title="Refresh WireGuard">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6 flex flex-col gap-6">
+                <!-- Controls row -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <button id="wgBtnStart" onclick="performWGAction('start')"
+                        class="sci-fi-button sci-fi-button-primary py-2 px-3 rounded font-mono text-xs tracking-widest uppercase flex justify-center items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Start
+                    </button>
+                    <button id="wgBtnRestart" onclick="performWGAction('restart')"
+                        class="sci-fi-button sci-fi-button-primary py-2 px-3 rounded font-mono text-xs tracking-widest uppercase flex justify-center items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Restart
+                    </button>
+                    <button id="wgBtnStop" onclick="performWGAction('stop')"
+                        class="sci-fi-button sci-fi-button-danger py-2 px-3 rounded font-mono text-xs tracking-widest uppercase flex justify-center items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+                        </svg>
+                        Stop
+                    </button>
+                    <button id="wgBtnInstall" onclick="performWGInstall()"
+                        class="sci-fi-button sci-fi-button-primary hidden py-2 px-3 rounded font-mono text-xs tracking-widest uppercase flex justify-center items-center gap-2"
+                        style="border-color:#f97316;color:#f97316;box-shadow:inset 0 0 10px rgba(249,115,22,0.1);">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Install WG
+                    </button>
+                </div>
+                <div id="wgActionFeedback" class="hidden text-xs font-mono p-3 rounded bg-black/50 border border-gray-800 text-gray-500 transition-opacity">
+                    > Sequence initiated...
+                </div>
+
+                <!-- Connected Peers table -->
+                <div class="sci-fi-card border-gray-800 overflow-hidden">
+                    <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-surface">
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            Connected Peers
+                        </h3>
+                        <span class="font-mono text-xs text-gray-500">ACTIVE: <span id="wgClientCount" class="text-primary">0</span></span>
+                    </div>
+                    <div class="overflow-x-auto bg-black/20">
+                        <table class="w-full text-left border-collapse glass-table">
+                            <thead class="bg-surface/50 sticky top-0 backdrop-blur-sm z-10">
+                                <tr>
+                                    <th class="p-4">Name</th>
+                                    <th class="p-4">Public Key</th>
+                                    <th class="p-4">Endpoint</th>
+                                    <th class="p-4">RX/TX</th>
+                                    <th class="p-4">Last Handshake</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wgConnectedBody">
+                                <tr><td colspan="5" class="text-center p-8 text-gray-500 font-mono text-sm shimmer">[ SCANNING WG PEERS... ]</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-t border-gray-800 bg-surface/80 text-xs text-gray-500 font-mono">
+                        <span id="wgLastUpdate">Last scan: --:--:--</span>
+                    </div>
+                </div>
+
+                <!-- Peer Management -->
+                <div class="sci-fi-card border-gray-800 overflow-hidden">
+                    <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-surface">
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                            </svg>
+                            Peer Management
+                        </h3>
+                        <button onclick="fetchWGPeers()" class="text-gray-500 hover:text-primary transition-colors focus:outline-none" title="Refresh">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-5 flex flex-col gap-4">
+                        <!-- Create peer form -->
+                        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                            <span class="text-xs uppercase tracking-widest text-gray-500 font-mono w-24">Peer Name</span>
+                            <input id="wgNewPeerName" type="text" placeholder="e.g. laptop-john" maxlength="64"
+                                class="flex-grow bg-black/40 border border-gray-700 text-gray-200 font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-primary transition-all"
+                                onkeydown="if(event.key==='Enter') createWGPeer()">
+                            <button onclick="createWGPeer()"
+                                class="sci-fi-button sci-fi-button-primary px-5 py-2 rounded font-mono text-xs tracking-widest uppercase whitespace-nowrap flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Add Peer
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-600 font-mono pl-0 sm:pl-28">
+                            &#9432; A WireGuard key-pair is generated server-side. Download the .conf and import it into any WireGuard client.
+                        </p>
+
+                        <!-- Feedback -->
+                        <div id="wgClientFeedback" class="hidden font-mono text-xs p-3 rounded bg-black/50 border border-primary text-primary"></div>
+
+                        <!-- Peers table -->
+                        <div class="overflow-x-auto rounded border border-gray-800">
+                            <table class="w-full text-left border-collapse glass-table">
+                                <thead class="bg-surface/50">
+                                    <tr>
+                                        <th class="p-4">Peer Name</th>
+                                        <th class="p-4">Status</th>
+                                        <th class="p-4">VPN IP</th>
+                                        <th class="p-4">Created</th>
+                                        <th class="p-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="wgPeersBody">
+                                    <tr><td colspan="5" class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest shimmer">[ LOADING WG PEERS... ]</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WireGuard Journal -->
+                <div class="sci-fi-card border-gray-800 overflow-hidden">
+                    <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-surface">
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            WG Journal
+                        </h3>
+                        <button onclick="fetchWGLogs()" class="text-gray-500 hover:text-primary transition-colors focus:outline-none" title="Refresh Logs">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-4 bg-black/30">
+                        <div id="wgLogPanel" class="text-gray-400" style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.5;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#27272a transparent;transition:opacity 0.15s ease;">[ Loading WG journal... ]</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // -----------------------------------------------------------------------
+        // WireGuard init on DOMContentLoaded
+        // -----------------------------------------------------------------------
+        document.addEventListener('DOMContentLoaded', function() {
+            // Called after the main DOMContentLoaded to ensure AOS already ran
+            fetchWGStatus();
+            fetchWGClients();
+            fetchWGPeers();
+            fetchWGLogs();
+            setInterval(function() {
+                fetchWGStatus();
+                fetchWGClients();
+            }, 8000);
+            setInterval(fetchWGPeers, 30000);
+            setInterval(fetchWGLogs, 15000);
+        });
+    </script>
     <section class="w-full max-w-6xl mx-auto mt-6 mb-10" data-aos="fade-up" data-aos-duration="600">
         <div class="sci-fi-card border-gray-800 shadow-xl overflow-hidden">
             <!-- Header -->
@@ -1889,6 +2082,332 @@
                     showModalFeedback('ERROR: ' + txt, true);
                 }
             } catch (err) { showModalFeedback('Connection error', true); }
+        }
+
+        // -----------------------------------------------------------------------
+        // WireGuard VPN
+        // -----------------------------------------------------------------------
+        const API_WG_STATUS   = '/api/wg/status';
+        const API_WG_ACTION   = '/api/wg/action';
+        const API_WG_INSTALL  = '/api/wg/install';
+        const API_WG_CLIENTS  = '/api/wg/clients';
+        const API_WG_LOGS     = '/api/wg/logs';
+        const API_WG_PEERS_CREATE   = '/api/wg/peers/create';
+        const API_WG_PEERS_LIST     = '/api/wg/peers/list';
+        const API_WG_PEERS_DOWNLOAD = '/api/wg/peers/download';
+        const API_WG_PEERS_REVOKE   = '/api/wg/peers/revoke';
+
+        let _wgPeersCache = [];
+        let _wgConnectedKeys = new Set();
+
+        function showWGFeedback(msg, isError = false) {
+            const el = document.getElementById('wgClientFeedback');
+            el.textContent = '> ' + msg;
+            el.className = `font-mono text-xs p-3 rounded bg-black/50 border ${
+                isError ? 'border-danger text-danger' : 'border-primary text-primary'
+            } block`;
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => { el.className = 'hidden'; }, 6000);
+        }
+
+        function showWGActionFeedback(msg, isError = false) {
+            const fb = document.getElementById('wgActionFeedback');
+            fb.innerHTML = `> ${escapeHtml(msg)}`;
+            fb.className = `mt-4 text-xs font-mono p-3 rounded bg-black/50 border ${isError ? 'border-danger text-danger' : 'border-primary text-primary'} block transition-opacity`;
+            setTimeout(() => {
+                fb.classList.add('opacity-0');
+                setTimeout(() => fb.classList.add('hidden'), 300);
+            }, 4000);
+        }
+
+        async function fetchWGStatus() {
+            try {
+                const res = await apiFetch(API_WG_STATUS);
+                const data = await res.json();
+                updateWGUIState(data);
+            } catch (err) {
+                if (err.message !== 'Unauthorized') console.error('WG status fetch failed', err);
+            }
+        }
+
+        function updateWGUIState(data) {
+            const indicator   = document.getElementById('wgStatusIndicator');
+            const statusText  = document.getElementById('wgStatusText');
+            const btnStart    = document.getElementById('wgBtnStart');
+            const btnStop     = document.getElementById('wgBtnStop');
+            const btnRestart  = document.getElementById('wgBtnRestart');
+            const btnInstall  = document.getElementById('wgBtnInstall');
+
+            btnStart.disabled = false;
+            btnStop.disabled = false;
+            btnRestart.disabled = false;
+            btnInstall.classList.add('hidden');
+
+            if (data.status === 'not_installed') {
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+                btnRestart.disabled = true;
+                btnInstall.classList.remove('hidden');
+                indicator.className = 'status-dot not-installed';
+                statusText.className = 'text-sm font-mono tracking-wider text-gray-500';
+                statusText.innerText = 'NOT INSTALLED';
+            } else if (data.active) {
+                btnStart.disabled = true;
+                indicator.className = 'status-dot active';
+                statusText.className = 'text-sm font-mono tracking-wider text-primary';
+                statusText.innerText = 'ONLINE';
+            } else if (data.status === 'failed') {
+                indicator.className = 'status-dot failed';
+                statusText.className = 'text-sm font-mono tracking-wider text-orange-400';
+                statusText.innerText = 'FAILED';
+            } else {
+                btnStop.disabled = true;
+                btnRestart.disabled = true;
+                indicator.className = 'status-dot inactive';
+                statusText.className = 'text-sm font-mono tracking-wider text-danger';
+                statusText.innerText = 'OFFLINE';
+            }
+        }
+
+        async function performWGAction(action) {
+            showWGActionFeedback(`INITIATING WG SEQUENCE: ${action.toUpperCase()}...`);
+            document.getElementById('wgBtnStart').disabled = true;
+            document.getElementById('wgBtnStop').disabled  = true;
+            document.getElementById('wgBtnRestart').disabled = true;
+            try {
+                const res = await apiFetch(API_WG_ACTION, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                if (res.ok) {
+                    showWGActionFeedback(`WG SEQUENCE COMPLETE: ${action.toUpperCase()}`);
+                    setTimeout(() => { fetchWGStatus(); fetchWGClients(); }, 1200);
+                } else {
+                    const txt = await res.text();
+                    showWGActionFeedback(`WG ERROR: ${txt}`, true);
+                    setTimeout(() => fetchWGStatus(), 800);
+                }
+            } catch (err) {
+                showWGActionFeedback('CONNECTION ERROR', true);
+            } finally {
+                setTimeout(() => fetchWGStatus(), 1200);
+            }
+        }
+
+        async function performWGInstall() {
+            const btn = document.getElementById('wgBtnInstall');
+            btn.disabled = true;
+            showWGActionFeedback('INSTALLING WIREGUARD — please wait...');
+            try {
+                const res = await apiFetch(API_WG_INSTALL, { method: 'POST' });
+                if (res.ok) {
+                    const d = await res.json();
+                    showWGActionFeedback(d.message || 'WireGuard installed.');
+                    setTimeout(() => fetchWGStatus(), 1500);
+                } else {
+                    const txt = await res.text();
+                    showWGActionFeedback(`INSTALL FAILED: ${txt}`, true);
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showWGActionFeedback('CONNECTION ERROR', true);
+                btn.disabled = false;
+            }
+        }
+
+        async function fetchWGClients() {
+            try {
+                const res = await apiFetch(API_WG_CLIENTS);
+                const data = await res.json();
+                _wgConnectedKeys = new Set((data || []).map(c => c.public_key));
+                renderWGConnected(data || []);
+                renderWGPeers();
+            } catch (err) {
+                if (err.message !== 'Unauthorized') console.error('WG clients fetch failed', err);
+            }
+        }
+
+        function renderWGConnected(data) {
+            const tbody  = document.getElementById('wgConnectedBody');
+            const count  = document.getElementById('wgClientCount');
+            const timeEl = document.getElementById('wgLastUpdate');
+
+            // Build name map
+            const nameByKey = {};
+            (_wgPeersCache || []).forEach(p => { nameByKey[p.public_key] = p.name; });
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest">[ NO ACTIVE WG CONNECTIONS ]</td></tr>`;
+                count.innerText = '0';
+            } else {
+                count.innerText = data.length;
+                tbody.innerHTML = data.map(c => {
+                    const name = c.name || nameByKey[c.public_key] || '—';
+                    const ts = (c.latest_handshake && c.latest_handshake !== '0') ? new Date(parseInt(c.latest_handshake)*1000).toLocaleString() : '—';
+                    return `
+                    <tr class="transition-colors group hover:bg-white/5 border-l-2 border-transparent hover:border-primary">
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-primary/50 group-hover:bg-primary group-hover:shadow-[0_0_8px_#00f0ff] transition-all"></div>
+                                <span class="text-gray-200 font-mono text-sm">${escapeHtml(name)}</span>
+                            </div>
+                        </td>
+                        <td class="text-gray-400 font-mono text-xs" title="${escapeHtml(c.public_key)}">${escapeHtml(c.public_key.substring(0,12))}…</td>
+                        <td class="text-gray-400 font-mono text-xs">${escapeHtml(c.endpoint !== '(none)' ? c.endpoint : '—')}</td>
+                        <td>
+                            <div class="flex flex-col gap-1 text-xs">
+                                <div class="flex justify-between w-24">
+                                    <span class="text-gray-500">RX:</span>
+                                    <span class="text-primary">${formatBytes(c.bytes_received)}</span>
+                                </div>
+                                <div class="flex justify-between w-24">
+                                    <span class="text-gray-500">TX:</span>
+                                    <span class="text-success">${formatBytes(c.bytes_sent)}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-gray-400 text-xs">${ts}</td>
+                    </tr>`;
+                }).join('');
+            }
+            if (timeEl) timeEl.innerText = `Last scan: ${new Date().toLocaleTimeString()}`;
+        }
+
+        async function fetchWGPeers() {
+            try {
+                const res = await apiFetch(API_WG_PEERS_LIST);
+                _wgPeersCache = await res.json();
+                renderWGPeers();
+            } catch (err) {
+                if (err.message !== 'Unauthorized') console.error('WG peers fetch failed', err);
+            }
+        }
+
+        function renderWGPeers() {
+            const tbody = document.getElementById('wgPeersBody');
+            const data  = _wgPeersCache;
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-gray-600 font-mono text-xs tracking-widest">[ NO WG PEERS CONFIGURED ]</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = data.map(p => {
+                const online = _wgConnectedKeys.has(p.public_key);
+                const badge = online
+                    ? `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono border border-success/50 text-success" style="background:rgba(16,185,129,0.07)">
+                         <span class="w-1.5 h-1.5 rounded-full bg-success" style="animation:pulse-glow-green 2s infinite"></span>ONLINE</span>`
+                    : `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono border border-gray-700 text-gray-500">
+                         <span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>OFFLINE</span>`;
+                return `
+                <tr class="group hover:bg-white/5 transition-colors border-l-2 ${online ? 'border-success/60' : 'border-transparent'} hover:border-primary">
+                    <td class="p-4">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ${online ? 'text-success' : 'text-primary/30 group-hover:text-primary'} transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                            <span class="font-mono text-sm ${online ? 'text-white' : 'text-gray-400'}">${escapeHtml(p.name)}</span>
+                        </div>
+                    </td>
+                    <td class="p-4">${badge}</td>
+                    <td class="p-4 text-gray-500 font-mono text-xs">${escapeHtml(p.ip)}</td>
+                    <td class="p-4 text-gray-500 font-mono text-xs">${formatDate(p.created)}</td>
+                    <td class="p-4">
+                        <div class="flex justify-end gap-2">
+                            <a href="${API_WG_PEERS_DOWNLOAD}?name=${encodeURIComponent(p.name)}"
+                               class="sci-fi-button sci-fi-button-primary px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase inline-flex items-center gap-1"
+                               download="${escapeHtml(p.name)}.conf">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                .conf
+                            </a>
+                            <button onclick="confirmRevokeWGPeer('${escapeHtml(p.name)}')"
+                                class="sci-fi-button sci-fi-button-danger px-3 py-1.5 rounded font-mono text-xs tracking-widest uppercase inline-flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                                Revoke
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function createWGPeer() {
+            const input = document.getElementById('wgNewPeerName');
+            const name = input.value.trim();
+            if (!name) { showWGFeedback('Please enter a peer name.', true); return; }
+            if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) {
+                showWGFeedback('Invalid name. Use only letters, numbers, dash, or underscore.', true);
+                return;
+            }
+            showWGFeedback('Generating WireGuard peer — please wait...');
+            try {
+                const res = await apiFetch(API_WG_PEERS_CREATE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const d = await res.json();
+                    showWGFeedback(d.message || `Peer '${name}' created.`);
+                    input.value = '';
+                    fetchWGPeers();
+                } else {
+                    const txt = await res.text();
+                    showWGFeedback('ERROR: ' + txt, true);
+                }
+            } catch (err) { showWGFeedback('Connection error', true); }
+        }
+
+        function confirmRevokeWGPeer(name) {
+            if (!confirm(`Revoke WireGuard peer '${name}'?\n\nThis will remove the peer from the server config and delete the .conf file.`)) return;
+            revokeWGPeer(name);
+        }
+
+        async function revokeWGPeer(name) {
+            showWGFeedback(`Revoking peer '${name}'...`);
+            try {
+                const res = await apiFetch(API_WG_PEERS_REVOKE, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const d = await res.json();
+                    showWGFeedback(d.message || `Peer '${name}' revoked.`);
+                    fetchWGPeers();
+                } else {
+                    const txt = await res.text();
+                    showWGFeedback('REVOKE FAILED: ' + txt, true);
+                }
+            } catch (err) { showWGFeedback('Connection error', true); }
+        }
+
+        let _wgLogText = '';
+        let _wgLogFetching = false;
+
+        async function fetchWGLogs() {
+            if (_wgLogFetching) return;
+            _wgLogFetching = true;
+            const panel = document.getElementById('wgLogPanel');
+            panel.classList.add('log-refreshing');
+            try {
+                const res = await apiFetch(`${API_WG_LOGS}?lines=60`);
+                const data = await res.json();
+                const text = (data.logs || '[ No WG log data ]').trimEnd();
+                if (text !== _wgLogText) {
+                    _wgLogText = text;
+                    panel.innerText = text;
+                    panel.scrollTop = panel.scrollHeight;
+                }
+            } catch (err) {
+                if (err.message !== 'Unauthorized') panel.innerText = '[ Failed to fetch WG logs ]';
+            } finally {
+                _wgLogFetching = false;
+                panel.classList.remove('log-refreshing');
+            }
         }
 
     </script>

@@ -308,7 +308,26 @@ systemctl restart openvpn-manager
 
 ---
 
-## 10. Referensi Konfigurasi
+## 10. WireGuard
+
+```bash
+# Install
+apt install wireguard
+
+# Generate server key
+wg genkey | tee /etc/wireguard/server_private.key | wg pubkey > /etc/wireguard/server_public.key
+
+# Buat /etc/wireguard/wg0.conf minimal:
+# [Interface]
+# PrivateKey = <server_private_key>
+# Address = 10.8.1.1/24
+# ListenPort = 51820
+
+systemctl enable --now wg-quick@wg0
+```
+---
+
+## 11. Referensi Konfigurasi
 
 ### `manager.toon`
 
