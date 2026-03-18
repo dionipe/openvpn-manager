@@ -1,4 +1,4 @@
-# OpenVPN Web Manager
+# OpenVPN & Wireguard Web Manager
 
 Web UI berbasis Go untuk mengelola OpenVPN server — start/stop/restart service,
 monitor koneksi aktif, generate & revoke client `.ovpn`, serta manajemen group + rules.
@@ -324,6 +324,14 @@ wg genkey | tee /etc/wireguard/server_private.key | wg pubkey > /etc/wireguard/s
 # ListenPort = 51820
 
 systemctl enable --now wg-quick@wg0
+```
+---
+## 12. Iptables
+
+```bash
+# apabila ada ethernet yang belum di masquerade Izinkan traffic antar interface:
+iptables -A FORWARD -i wg0 -o eth1 -j ACCEPT
+iptables -A FORWARD -i eth1 -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT
 ```
 ---
 
