@@ -68,6 +68,12 @@ func loadEnvFile(path string) {
 				val = val[1 : len(val)-1]
 			}
 		}
+		// Strip inline # comments (must be preceded by whitespace, e.g. "value  # comment")
+		if i := strings.Index(val, " #"); i >= 0 {
+			val = strings.TrimSpace(val[:i])
+		} else if i := strings.Index(val, "\t#"); i >= 0 {
+			val = strings.TrimSpace(val[:i])
+		}
 		// Only set if not already present in the real environment
 		if os.Getenv(key) == "" {
 			os.Setenv(key, val)
@@ -1610,25 +1616,20 @@ func handleWGClientCreate(w http.ResponseWriter, r *http.Request) {
 		endpoint = serverPublicIP + ":51820"
 	}
 
-	// Read server public key from config
+	// Get the server public key from the running interface (most reliable).
 	serverPubKey := ""
-	if confData, err2 := os.ReadFile(wgConfigFile); err2 == nil {
-		for _, line := range strings.Split(string(confData), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "PublicKey") || strings.HasPrefix(line, "# ServerPublicKey") {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					serverPubKey = strings.TrimSpace(parts[1])
-					break
-				}
-			}
-		}
+	if out, e := exec.Command("sudo", "wg", "show", wgInterface, "public-key").Output(); e == nil {
+		serverPubKey = strings.TrimSpace(string(out))
 	}
-	// Fallback: derive from server private key
+	// Fallback: derive from the PrivateKey in [Interface] section of wg0.conf.
+	// Only scan lines before the first [Peer] block to avoid picking up a peer's PublicKey.
 	if serverPubKey == "" {
 		if confData, err2 := os.ReadFile(wgConfigFile); err2 == nil {
 			for _, line := range strings.Split(string(confData), "\n") {
 				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "[Peer]") {
+					break // stop — do not read peer sections
+				}
 				if strings.HasPrefix(line, "PrivateKey") {
 					parts := strings.SplitN(line, "=", 2)
 					if len(parts) == 2 {
